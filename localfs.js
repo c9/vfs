@@ -10,7 +10,7 @@ var getMime = require('simple-mime')("application/octet-stream");
 //   fsOptions.umask - default umask for creating files
 //   fsOptions.root - root path to mount
 module.exports = function setup(fsOptions) {
-  var root = fsOptions.root || "/";
+  var root = fs.realpathSync(fsOptions.root || "/");
 
   // Like fs.createReadStream, except with added HTTP-like options.
   // Doesn't return a stream immedietly, but as a "stream" option in the meta
