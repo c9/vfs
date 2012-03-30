@@ -1,5 +1,4 @@
 var http = require('http');
-var join = require('path').join;
 var urlParse = require('url').parse;
 
 var vfs = require('./localfs')({
