@@ -29,7 +29,7 @@ http.createServer(function (req, res) {
   }
 
   var path = urlParse(req.url).pathname;
-  
+
   if (req.method === "GET") {
 
     if (req.headers.hasOwnProperty("if-none-match")) options.etag = req.headers["if-none-match"];
@@ -46,7 +46,7 @@ http.createServer(function (req, res) {
       }
       if (req.headers.hasOwnProperty('if-range')) range.etag = req.headers["if-range"];
     }
-    
+
     if (path[path.length - 1] === "/") {
       vfs.readdir(path, options, onGet);
     } else {
@@ -57,7 +57,7 @@ http.createServer(function (req, res) {
       res.setHeader("Date", (new Date()).toUTCString());
       if (err) return abort(err);
       if (meta.rangeNotSatisfiable) return abort(meta.rangeNotSatisfiable, 416);
-      
+
       if (meta.hasOwnProperty('etag')) res.setHeader("ETag", meta.etag);
 
       if (meta.notModified) res.statusCode = 304;
@@ -84,7 +84,9 @@ http.createServer(function (req, res) {
   else {
     return abort("Unsupported HTTP method", 501);
   }
-  
+
+  // TODO: Atomic writes using temp file
+
 }).listen(9000, function () {
   console.log("Server listening at " + httpRoot);
 });
