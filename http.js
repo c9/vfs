@@ -3,6 +3,7 @@ var urlParse = require('url').parse;
 
 var vfs = require('./localfs')({
   root: "/home/tim/architect/demos/editor/www/",
+  httpRoot: "http://localhost:9000/",
   uid: 1000,
   gid: 100
 });

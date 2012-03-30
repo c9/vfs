@@ -1,6 +1,7 @@
 var fs = require('fs');
 var join = require('path').join;
 var dirname = require('path').dirname;
+var basename = require('path').basename;
 var Stream = require('stream').Stream;
 var getMime = require('simple-mime')("application/octet-stream");
 
@@ -41,6 +42,10 @@ function canAccess(path, uid, gid, callback) {
   });
 }
 
+function calcEtag(stat) {
+  return '"' + stat.ino.toString(32) + "-" + stat.size.toString(32) + "-" + stat.mtime.valueOf().toString(32) + '"';
+}
+
 
 // @fsOptions can have:
 //   fsOptions.uid - restricts access as if this user was running as
@@ -48,8 +53,11 @@ function canAccess(path, uid, gid, callback) {
 //   fsOptions.umask - default umask for creating files
 //   fsOptions.root - root path to mount, this needs to be realpath'ed or it won't work.
 //   fsOptions.skipSearchCheck - Skip the folder execute/search permission check on file open.
+//   fsOptions.httpRoot - used for generating links in directory listing.  It's where this fs is mounted over http.
 module.exports = function setup(fsOptions) {
   var root = fsOptions.root || "/";
+  if (root[root.length - 1] !== "/") root += "/";
+  var base = root.substr(0, root.length - 1);
   var umask = fsOptions.umask || 0750;
   var checkPermissions;
   if (fsOptions.hasOwnProperty("uid") || fsOptions.hasOwnProperty("gid")) {
@@ -59,19 +67,18 @@ module.exports = function setup(fsOptions) {
     checkPermissions = true;
   }
   
-  // Realpath, open, and stat a file
-  // Doing security checks along the way.
-  // callback(err, path, fd, stat)
-  function open(path, mode, flags, callback) {
+  // Realpath a file and check for access
+  // callback(err, path)
+  function realpath(path, callback) {
     fs.realpath(join(root, path), function (err, path) {
       if (err) return callback(err);
-      if (path.substr(0, root.length) !== root) {
-        var err = new Error("ENOENT: '" + path + "' not in '" + root + "'");
-        err.code = "ENOENT";
+      if (!(path === base || path.substr(0, root.length) === root)) {
+        var err = new Error("EACCESS: '" + path + "' not in '" + root + "'");
+        err.code = "EACCESS";
         return callback(err);
       }
       if (!checkPermissions || fsOptions.skipSearchCheck) {
-        fs.open(path, mode, flags, onOpen);
+        return callback(null, path);
       } else {
         canAccess(path, fsOptions.uid, fsOptions.gid, function (err, access) {
           if (err) return callback(err);
@@ -80,10 +87,19 @@ module.exports = function setup(fsOptions) {
             err.code = "EACCESS";
             return callback(err);
           }
-          fs.open(path, mode, flags, onOpen);
+          callback(null, path);
         });
       }
-      function onOpen(err, fd) {
+    });
+  }
+  
+  // Realpath, open, and stat a file
+  // Doing security checks along the way.
+  // callback(err, path, fd, stat)
+  function open(path, mode, flags, callback) {
+    realpath(path, function (err, path) {
+      if (err) return callback(err);
+      fs.open(path, mode, flags, function (err, fd) {
         if (err) return callback(err);
         fs.fstat(fd, function (err, stat) {
           if (err) return callback(err);
@@ -94,9 +110,34 @@ module.exports = function setup(fsOptions) {
           }
           return callback(null, path, fd, stat);
         });
-      }
+      });
     });
-  }  
+  }
+  
+  // Like open above, except just does stat
+  // Also shows symlinks and declares allowed permissions
+  // Realpath and stat a file
+  // Doing security checks along the way.
+  // callback(err, path, stat)
+  function lstat(path, callback) {
+    var filename = basename(path);
+    realpath(dirname(path), function (err, dir) {
+      if (err) return callback(err);
+      var path = join(dir, filename);
+      fs.lstat(path, function (err, stat) {
+        if (err) return callback(err);
+        if (checkPermissions) {
+          var owner = fsOptions.uid === stat.uid;
+          var inGroup = fsOptions.gid === stat.gid;
+          stat.access = (canRead(owner, inGroup, stat.mode) ? 4 : 0) +
+                        (canWrite(owner, inGroup, stat.mode) ? 2 : 0) +
+                        (canExec(owner, inGroup, stat.mode) ? 1 : 0);
+        }
+        callback(null, path, stat);
+      });
+    });
+  }
+  
 
   // Like fs.createReadStream, except with added HTTP-like options.
   // Doesn't return a stream immedietly, but as a "stream" option in the meta
@@ -125,17 +166,19 @@ module.exports = function setup(fsOptions) {
     open(path, "r", umask & 0666, function (err, path, fd, stat) {
       if (err) return callback(err);
       if (!stat.isFile()) {
-        
+        fs.close(fd);
+        return callback(new Error("Requested resource is not a file"));
       }
 
       // Basic file info
       meta.mime = getMime(path);
       meta.size = stat.size;
-      meta.etag = '"' + stat.ino.toString(32) + "-" + stat.size.toString(32) + "-" + stat.mtime.valueOf().toString(32) + '"';
+      meta.etag = calcEtag(stat);
       
       // ETag support
       if (options.etag === meta.etag) {
         meta.notModified = true;
+        fs.close(fd);
         return callback(null, meta);
       }
 
@@ -146,6 +189,7 @@ module.exports = function setup(fsOptions) {
         var end = range.hasOwnProperty("end") ? range.end : stat.size - 1;
         if (end < start || start < 0 || end >= stat.size) {
           meta.rangeNotSatisfiable = "Range out of bounds";
+          fs.close(fd);
           return callback(null, meta);
         }
         options.start = start;
@@ -156,6 +200,7 @@ module.exports = function setup(fsOptions) {
       
       // HEAD request support
       if (options.hasOwnProperty("head")) {
+        fs.close(fd);
         return callback(null, meta);
       }
       
@@ -164,22 +209,26 @@ module.exports = function setup(fsOptions) {
         options.fd = fd;
         meta.stream = new fs.ReadStream(path, options);
       } catch (err) {
+        fs.close(fd);
         return callback(err);
       }
       callback(null, meta);
     });
   }
 
+  // Reads a directory and streams data about the files as json.
+  // The order of the files in undefined.  The client should sort afterwards.
   function readdir(path, options, callback) {
     var meta = {};
     
     open(path, "r", umask & 0777, function (err, path, fd, stat) {
       if (err) return callback(err);
+      fs.close(fd);
       if (!stat.isDirectory()) {
+        return callback(new Error("Requested resource is not a directory"));
       }
 
-      meta.mime = getMime(path);
-      meta.etag = '"' + stat.ino.toString(32) + "-" + stat.size.toString(32) + "-" + stat.mtime.valueOf().toString(32) + '"';
+      meta.etag = 'W/' + calcEtag(stat);
 
       // ETag support
       if (options.etag === meta.etag) {
@@ -187,11 +236,77 @@ module.exports = function setup(fsOptions) {
         return callback(null, meta);
       }
 
-      
-    });
+      fs.readdir(path, function (err, files) {
+        if (err) return callback(err);
+        var stream = new Stream();
+        stream.readable = true;
+        meta.mime = "application/json";
+        meta.stream = stream;
+        callback(null, meta);
+        stream.emit("data", "[");
+        var left = files.length;
+        files.forEach(function (file) {
+          var filepath = join(path.substr(base.length), file);
+          if (filepath[0] !== "/") filepath = "/" + filepath;
+          lstat(filepath, function (err, path, stat) {
+            var entry = {
+              name: file,
+              path: filepath,
+            };
 
+            if (err) {
+              entry.err = err.stack || err;
+              return send();
+            } else {
+              if (stat.isDirectory()) {
+                entry.mime = "inode/directory";
+                if (fsOptions.httpRoot) {
+                  entry.href = fsOptions.httpRoot + filepath.substr(1) + "/";
+                }
+              } else if (stat.isBlockDevice()) entry.mime = "inode/blockdevice";
+              else if (stat.isCharacterDevice()) entry.mime = "inode/chardevice";
+              else if (stat.isSymbolicLink()) entry.mime = "inode/symlink";
+              else if (stat.isFIFO()) entry.mime = "inode/fifo";
+              else if (stat.isSocket()) entry.mime = "inode/socket";
+              else {
+                entry.mime = getMime(filepath);
+                if (fsOptions.httpRoot) {
+                  entry.href = fsOptions.httpRoot + filepath.substr(1);
+                }
+              }
+              entry.access = stat.access;
+              entry.size = stat.size;
+              entry.etag = calcEtag(stat);
+            
+              if (!stat.isSymbolicLink()) {
+                return send();
+              }
+              fs.readlink(path, function (err, link) {
+                if (err) {
+                  entry.linkErr = err.stack;
+                } else {
+                  entry.link = link;
+                }
+                send();
+              });
+            }
+            function send() {
+              left--;
+              stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
+              check();
+            }
+          });
+        });
+        check();
+        function check() {
+          if (!left) {
+            stream.emit("data", "\n]\n");
+            stream.emit("end")
+          }
+        }
+      });
+    }, true);
   }
-  
   
   return {
     createReadStream: createReadStream,
