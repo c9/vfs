@@ -43,8 +43,6 @@ http.createServer(function (req, res) {
   vfs.createReadStream(path, options, function (err, meta) {
     res.setHeader("Date", (new Date()).toUTCString());
     if (err) return abort(err);
-    if (meta.forbidden) return abort(meta.forbidden, 403);
-    if (meta.notFound) return abort(meta.notFound, 404);
     if (meta.rangeNotSatisfiable) return abort(meta.rangeNotSatisfiable, 416);
     
     if (meta.hasOwnProperty('etag')) res.setHeader("ETag", meta.etag);
