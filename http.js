@@ -33,30 +33,25 @@ http.createServer(function (req, res) {
   if (req.method === "GET") {
 
     if (req.headers.hasOwnProperty("if-none-match")) options.etag = req.headers["if-none-match"];
-    
-    if (path[path.length - 1] === "/") { // directory serve
-      
-      vfs.readdir(path, options, onGet);
-    
-    } // end directory serve
-    else { // file serve
 
-      if (req.headers.hasOwnProperty('range')) {
-        var range = options.range = {};
-        var p = req.headers.range.indexOf('=');
-        var parts = req.headers.range.substr(p + 1).split('-');
-        if (parts[0].length) {
-          range.start = parseInt(parts[0], 10);
-        }
-        if (parts[1].length) {
-          range.end = parseInt(parts[1], 10);
-        }
-        if (req.headers.hasOwnProperty('if-range')) range.etag = req.headers["if-range"];
+    if (req.headers.hasOwnProperty('range')) {
+      var range = options.range = {};
+      var p = req.headers.range.indexOf('=');
+      var parts = req.headers.range.substr(p + 1).split('-');
+      if (parts[0].length) {
+        range.start = parseInt(parts[0], 10);
       }
-      
+      if (parts[1].length) {
+        range.end = parseInt(parts[1], 10);
+      }
+      if (req.headers.hasOwnProperty('if-range')) range.etag = req.headers["if-range"];
+    }
+    
+    if (path[path.length - 1] === "/") {
+      vfs.readdir(path, options, onGet);
+    } else {
       vfs.createReadStream(path, options, onGet);
-
-    } // end file serve
+    }
 
     function onGet(err, meta) {
       res.setHeader("Date", (new Date()).toUTCString());

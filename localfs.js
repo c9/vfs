@@ -323,6 +323,8 @@ module.exports = function setup(fsOptions) {
     }, true);
   }
   
+  // TODO: atomic writes
+  
   return {
     createReadStream: createReadStream,
     readdir: readdir,
