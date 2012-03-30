@@ -34,11 +34,10 @@ module.exports = function setup(fsOptions) {
   //     meta.etag - the etag of the file (embeds inode, size and mtime)
   //     meta.stream - a readable stream if the response should have a body.
   function createReadStream(path, options, callback) {
-    path = join(root, path);
     var meta = {
       mime: getMime(path),
     };
-    fs.open(path, "r", function (err, fd) {
+    fs.realpath(join(root, path), function (err, path) {
       if (err) {
         if (err.code === "ENOENT") {
           meta.notFound = err;
@@ -46,55 +45,64 @@ module.exports = function setup(fsOptions) {
         }
         return callback(err);
       }
-      fs.fstat(fd, function (err, stat) {
+      // Make sure the resolved path is within the declared root.
+      if (path.substr(0, root.length) !== root) {
+        meta.notFound = "Invalid path";
+        return callback(null, meta);
+      }
+      fs.open(path, "r", function (err, fd) {
         if (err) return callback(err);
+        fs.fstat(fd, function (err, stat) {
+          if (err) return callback(err);
 
-        meta.size = stat.size;
-        meta.etag = '"' + stat.ino.toString(32) + "-" + stat.size.toString(32) + "-" + stat.mtime.valueOf().toString(32) + '"';
-        
-        if (options.etag === meta.etag) {
-          meta.notModified = true;
-          return callback(null, meta);
-        }
-
-        if (options.hasOwnProperty('range') && !(options.range.etag && options.range.etag !== meta.etag)) {
-          var start = 0, end = stat.size - 1;
-          if (options.range.hasOwnProperty("start")) {
-            start = options.range.start;
-          }
-          if (options.range.hasOwnProperty("end")) {
-            end = options.range.end;
+          meta.size = stat.size;
+          meta.etag = '"' + stat.ino.toString(32) + "-" + stat.size.toString(32) + "-" + stat.mtime.valueOf().toString(32) + '"';
+          
+          if (options.etag === meta.etag) {
+            meta.notModified = true;
+            return callback(null, meta);
           }
 
-          var message;
-          if (end < start) message = "start after end";
-          if (start < 0) message = "start before 0";
-          if (end >= stat.size) message = "end after length";
-          if (message) {
-            meta.rangeNotSatisfiable = message;
+          if (options.hasOwnProperty('range') && !(options.range.etag && options.range.etag !== meta.etag)) {
+            var start = 0, end = stat.size - 1;
+            if (options.range.hasOwnProperty("start")) {
+              start = options.range.start;
+            }
+            if (options.range.hasOwnProperty("end")) {
+              end = options.range.end;
+            }
+
+            var message;
+            if (end < start) message = "start after end";
+            if (start < 0) message = "start before 0";
+            if (end >= stat.size) message = "end after length";
+            if (message) {
+              meta.rangeNotSatisfiable = message;
+              return callback(null, meta);
+            }
+            
+            options.start = start;
+            options.end = end;
+            meta.size = end - start + 1;
+            meta.partialContent = { start: start, end: end, size: stat.size };
+          }
+          
+          // Skip the body for head requests
+          if (options.hasOwnProperty("head")) {
             return callback(null, meta);
           }
           
-          options.start = start;
-          options.end = end;
-          meta.size = end - start + 1;
-          meta.partialContent = { start: start, end: end, size: stat.size };
-        }
-        
-        // Skip the body for head requests
-        if (options.hasOwnProperty("head")) {
-          return callback(null, meta);
-        }
-        
-        // Create the stream and pass it along
-        try {
-          options.fd = fd;
-          meta.stream = new fs.ReadStream(path, options);
-        } catch (err) {
-          return callback(err);
-        }
-        callback(null, meta);
+          // Create the stream and pass it along
+          try {
+            options.fd = fd;
+            meta.stream = new fs.ReadStream(path, options);
+          } catch (err) {
+            return callback(err);
+          }
+          callback(null, meta);
+        });
       });
+    
     });
   }
   
