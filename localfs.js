@@ -1,5 +1,6 @@
 var fs = require('fs');
 var join = require('path').join;
+var dirname = require('path').dirname;
 var Stream = require('stream').Stream;
 var getMime = require('simple-mime')("application/octet-stream");
 
@@ -19,12 +20,34 @@ function canExec(owner, inGroup, mode) {
          inGroup && (mode & 00010) || // User is in group and group can exec.
          (mode & 00001); // Anyone can write.
 }
+function canOpen(flag, owner, inGroup, mode) {
+  if (flag[flag.length - 1] === "+") {
+    return canRead(owner, inGroup, mode) && canWrite(owner, inGroup, mode);
+  }
+  if (flag.toLowerCase() === 'r') return canRead(owner, inGroup, mode);
+  return canWrite(owner, inGroup, mode);
+}
+function canAccess(path, uid, gid, callback) {
+  var dir = dirname(path);
+  fs.stat(dir, function (err, stat) {
+    if (err) return callback(err);
+    if (!canExec(uid === stat.uid, gid === stat.gid, stat.mode)) {
+      return callback(null, false);
+    }
+    if (dir === "/") {
+      return callback(null, true);
+    }
+    canAccess(dir, uid, gid, callback);
+  });
+}
+
 
 // @fsOptions can have:
 //   fsOptions.uid - restricts access as if this user was running as
 //   fsOptions.gid   this uid/gid, create files as this user.
 //   fsOptions.umask - default umask for creating files
 //   fsOptions.root - root path to mount, this needs to be realpath'ed or it won't work.
+//   fsOptions.skipSearchCheck - Skip the folder execute/search permission check on file open.
 module.exports = function setup(fsOptions) {
   var root = fsOptions.root || "/";
   var umask = fsOptions.umask || 0750;
@@ -47,18 +70,31 @@ module.exports = function setup(fsOptions) {
         err.code = "ENOENT";
         return callback(err);
       }
-      fs.open(path, mode, flags, function (err, fd) {
+      if (!checkPermissions || fsOptions.skipSearchCheck) {
+        fs.open(path, mode, flags, onOpen);
+      } else {
+        canAccess(path, fsOptions.uid, fsOptions.gid, function (err, access) {
+          if (err) return callback(err);
+          if (!access) {
+            var err = new Error("EACCESS: Access Denied");
+            err.code = "EACCESS";
+            return callback(err);
+          }
+          fs.open(path, mode, flags, onOpen);
+        });
+      }
+      function onOpen(err, fd) {
         if (err) return callback(err);
         fs.fstat(fd, function (err, stat) {
           if (err) return callback(err);
-          if (checkPermissions && !canRead(fsOptions.uid === stat.uid, fsOptions.gid === stat.gid, stat.mode)) {
+          if (checkPermissions && !canOpen(mode, fsOptions.uid === stat.uid, fsOptions.gid === stat.gid, stat.mode)) {
             var err = new Error("EACCESS: Permission Denied");
             err.code = "EACCESS";
             return callback(err);
           }
           return callback(null, path, fd, stat);
         });
-      });
+      }
     });
   }  
 
@@ -88,6 +124,9 @@ module.exports = function setup(fsOptions) {
     
     open(path, "r", umask & 0666, function (err, path, fd, stat) {
       if (err) return callback(err);
+      if (!stat.isFile()) {
+        
+      }
 
       // Basic file info
       meta.mime = getMime(path);
@@ -136,6 +175,18 @@ module.exports = function setup(fsOptions) {
     
     open(path, "r", umask & 0777, function (err, path, fd, stat) {
       if (err) return callback(err);
+      if (!stat.isDirectory()) {
+      }
+
+      meta.mime = getMime(path);
+      meta.etag = '"' + stat.ino.toString(32) + "-" + stat.size.toString(32) + "-" + stat.mtime.valueOf().toString(32) + '"';
+
+      // ETag support
+      if (options.etag === meta.etag) {
+        meta.notModified = true;
+        return callback(null, meta);
+      }
+
       
     });
 
