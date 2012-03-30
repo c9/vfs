@@ -3,17 +3,20 @@ var urlParse = require('url').parse;
 
 var vfs = require('./localfs')({
   root: "/home/tim/architect/demos/editor/www/",
-  uid: "tim",
-  gid: "tim"
+  uid: 1000,
+  gid: 100
 });
 
 http.createServer(function (req, res) {
 
   function abort(err, code) {
-    res.statusCode = code || 500;
+    if (code) res.statusCode = code;
+    else if (err.code === "ENOENT") res.statusCode = 404;
+    else if (err.code === "EACCESS") res.statucCode = 403;
+    else res.statusCode = 500;
     message = (err.stack || err) + "\n";
-    res.setHeader("Content-Length", Buffer.byteLength(message));
     res.setHeader("Content-Type", "text/plain");
+    res.setHeader("Content-Length", Buffer.byteLength(message));
     res.end(message);
   }
 
@@ -40,6 +43,7 @@ http.createServer(function (req, res) {
   vfs.createReadStream(path, options, function (err, meta) {
     res.setHeader("Date", (new Date()).toUTCString());
     if (err) return abort(err);
+    if (meta.forbidden) return abort(meta.forbidden, 403);
     if (meta.notFound) return abort(meta.notFound, 404);
     if (meta.rangeNotSatisfiable) return abort(meta.rangeNotSatisfiable, 416);
     
