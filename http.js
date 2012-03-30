@@ -1,12 +1,12 @@
 var http = require('http');
 var urlParse = require('url').parse;
 
-var httpRoot = "http://localhost:9000/";
+var httpRoot = "http://creationix.com:9000/";
 var vfs = require('./localfs')({
-  root: "/home/tim/architect/demos/editor/www/",
+  root: "/home/tim/creationix.com/",
   httpRoot: httpRoot,
   uid: 1000,
-  gid: 100
+  gid: 10000
 });
 
 http.createServer(function (req, res) {
