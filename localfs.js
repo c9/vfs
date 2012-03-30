@@ -126,14 +126,29 @@ module.exports = function setup(fsOptions) {
       var path = join(dir, filename);
       fs.lstat(path, function (err, stat) {
         if (err) return callback(err);
-        if (checkPermissions) {
-          var owner = fsOptions.uid === stat.uid;
-          var inGroup = fsOptions.gid === stat.gid;
-          stat.access = (canRead(owner, inGroup, stat.mode) ? 4 : 0) +
-                        (canWrite(owner, inGroup, stat.mode) ? 2 : 0) +
-                        (canExec(owner, inGroup, stat.mode) ? 1 : 0);
+        if (fsOptions.skipSearchCheck || !checkPermissions) {
+          return finish();
         }
-        callback(null, path, stat);
+        fs.stat(dir, function (err, dstat) {
+          if (err) return callback(err);
+          if (!canExec(fsOptions.uid === dstat.uid, fsOptions.gid === dstat.gid, dstat.mode)) {
+            var err = new Error("EACCESS: Access Denied");
+            err.code = "EACCESS";
+            return callback(err);
+          }
+          finish();
+        });
+
+        function finish() {
+          if (checkPermissions) {
+            var owner = fsOptions.uid === stat.uid;
+            var inGroup = fsOptions.gid === stat.gid;
+            stat.access = (canRead(owner, inGroup, stat.mode) ? 4 : 0) +
+                          (canWrite(owner, inGroup, stat.mode) ? 2 : 0) +
+                          (canExec(owner, inGroup, stat.mode) ? 1 : 0);
+          }
+          callback(null, path, stat);
+        }
       });
     });
   }

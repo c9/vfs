@@ -1,9 +1,10 @@
 var http = require('http');
 var urlParse = require('url').parse;
 
+var httpRoot = "http://localhost:9000/";
 var vfs = require('./localfs')({
   root: "/home/tim/architect/demos/editor/www/",
-  httpRoot: "http://localhost:9000/",
+  httpRoot: httpRoot,
   uid: 1000,
   gid: 100
 });
@@ -90,5 +91,5 @@ http.createServer(function (req, res) {
   }
   
 }).listen(9000, function () {
-  console.log("Server listening at http://localhost:9000/");
+  console.log("Server listening at " + httpRoot);
 });
