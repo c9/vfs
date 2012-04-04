@@ -1,12 +1,12 @@
 var http = require('http');
 var urlParse = require('url').parse;
 
-var httpRoot = "http://creationix.com:9000/";
+var httpRoot = "http://localhost:9000/";
 var vfs = require('./localfs')({
-  root: "/home/tim/creationix.com/",
+  root: "/home/tim/",
   httpRoot: httpRoot,
   uid: 1000,
-  gid: 10000
+  gid: 100
 });
 
 http.createServer(function (req, res) {
@@ -81,6 +81,19 @@ http.createServer(function (req, res) {
     }
 
   } // end GET request
+    
+  else if (req.method === "PUT") {
+    // TODO: honor real request
+    vfs.createWriteStream("test.txt", {}, function (err, meta) {
+      console.log("onCreateWriteStream", err && err.stack, meta);
+      meta.stream.write("Test!\n");
+      meta.stream.end();
+      meta.stream.on("saved", function () {
+        console.log("Saved!");
+      });
+    });
+
+  } // end PUT request
   else {
     return abort("Unsupported HTTP method", 501);
   }

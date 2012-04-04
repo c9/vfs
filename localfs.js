@@ -22,6 +22,7 @@ function canExec(owner, inGroup, mode) {
          (mode & 00001); // Anyone can write.
 }
 function canOpen(flag, owner, inGroup, mode) {
+  console.log("canOpen", flag, owner, inGroup, mode);
   if (flag[flag.length - 1] === "+") {
     return canRead(owner, inGroup, mode) && canWrite(owner, inGroup, mode);
   }
@@ -323,10 +324,51 @@ module.exports = function setup(fsOptions) {
     }, true);
   }
   
-  // TODO: atomic writes
+  function createWriteStream(path, options, callback) {
+    var meta = {};
+
+    // Make sure the user has access to the directory and get the real path.
+    realpath(dirname(path), function (err, dir) {
+      if (err) return callback(err);
+      path = join(dir, basename(path));
+      // Use a temp file for both atomic saves and to ensure we never write to
+      // existing files.  Writing to an existing symlink would bypass the
+      // security restrictions.
+      var tmpPath = path + "." + (Date.now() + Math.random() * 0x100000000).toString(36);
+      fs.open(tmpPath, "w", umask & 0666, function (err, fd) {
+        if (err) return callback(err);
+        options.fd = fd;
+        if (checkPermissions) {
+          // Set the new file to the specified user
+          fs.fchown(fd, fsOptions.uid || 0, fsOptions.gid || 0, function (err) {
+            if (err) {
+              fs.close(fd);
+              return callback(err);
+            }
+            onCreate();
+          });
+        } else {
+          onCreate();
+        }
+        function onCreate() {
+          var stream = new fs.WriteStream(path, options);
+          stream.on('close', function () {
+            fs.rename(tmpPath, path, function (err) {
+              if (err) return stream.emit("error", err);
+              stream.emit("saved");
+            });
+          });
+          meta.stream = stream;
+          meta.tmpPath = tmpPath;
+          callback(null, meta);
+        }
+      });
+    });
+  }
   
   return {
     createReadStream: createReadStream,
+    createWriteStream: createWriteStream,
     readdir: readdir,
   };
 
