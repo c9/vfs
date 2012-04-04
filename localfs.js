@@ -22,7 +22,6 @@ function canExec(owner, inGroup, mode) {
          (mode & 00001); // Anyone can write.
 }
 function canOpen(flag, owner, inGroup, mode) {
-  console.log("canOpen", flag, owner, inGroup, mode);
   if (flag[flag.length - 1] === "+") {
     return canRead(owner, inGroup, mode) && canWrite(owner, inGroup, mode);
   }

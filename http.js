@@ -83,14 +83,20 @@ http.createServer(function (req, res) {
   } // end GET request
     
   else if (req.method === "PUT") {
-    // TODO: honor real request
-    vfs.createWriteStream("test.txt", {}, function (err, meta) {
-      console.log("onCreateWriteStream", err && err.stack, meta);
-      meta.stream.write("Test!\n");
-      meta.stream.end();
-      meta.stream.on("saved", function () {
-        console.log("Saved!");
-      });
+    // TODO: Does this pause/buffer *all* events or just some?
+    req.pause();
+    vfs.createWriteStream(path, {}, function (err, meta) {
+      if (err) return abort(err);
+      if (meta.stream) {
+        meta.stream.on("error", abort);
+        req.pipe(meta.stream);
+        req.resume();
+        meta.stream.on("saved", function () {
+          res.end();
+        });
+      } else {
+        res.end();
+      }
     });
 
   } // end PUT request
