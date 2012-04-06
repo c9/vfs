@@ -51,7 +51,7 @@ http.createServer(function (req, res) {
     if (path[path.length - 1] === "/") {
       vfs.readdir(path, options, onGet);
     } else {
-      vfs.createReadStream(path, options, onGet);
+      vfs.readfile(path, options, onGet);
     }
 
     function onGet(err, meta) {
@@ -93,7 +93,7 @@ http.createServer(function (req, res) {
     } else {
       // TODO: Does this pause/buffer *all* events or just some?
       req.pause();
-      vfs.createWriteStream(path, {}, function (err, meta) {
+      vfs.mkfile(path, {}, function (err, meta) {
         if (err) return abort(err);
         if (meta.stream) {
           meta.stream.on("error", abort);

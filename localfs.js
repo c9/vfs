@@ -186,7 +186,7 @@ module.exports = function setup(fsOptions) {
   //     meta.size - the size of the file
   //     meta.etag - the etag of the file (embeds inode, size and mtime)
   //     meta.stream - a readable stream if the response should have a body.
-  function createReadStream(path, options, callback) {
+  function readfile(path, options, callback) {
     var meta = {};
 
     open(path, "r", umask & 0666, function (err, path, fd, stat) {
@@ -344,7 +344,7 @@ module.exports = function setup(fsOptions) {
 
   // This is used for creating / overwriting files.  It always creates a new tmp
   // file and then renamed to the final destination.
-  function createWriteStream(path, options, callback) {
+  function createfile(path, options, callback) {
     var meta = {};
 
     // Make sure the user has access to the directory and get the real path.
@@ -464,9 +464,9 @@ module.exports = function setup(fsOptions) {
   // existing functions.
   function copy(path, options, callback) {
     var meta = {};
-    createWriteStream(path, {}, function (err, writeMeta) {
+    createfile(path, {}, function (err, writeMeta) {
       if (err) return callback(err);
-      createReadStream(options.from, {}, function (err, readMeta) {
+      readfile(options.from, {}, function (err, readMeta) {
         if (err) return callback(err);
         readMeta.stream.pipe(writeMeta.stream);
         writeMeta.stream.on("error", callback);
@@ -496,8 +496,8 @@ module.exports = function setup(fsOptions) {
   }
 
   return {
-    createReadStream: createReadStream,
-    createWriteStream: createWriteStream,
+    readfile: readfile,
+    createfile: createfile,
     unlink: unlink,
     readdir: readdir,
     mkdir: mkdir,
