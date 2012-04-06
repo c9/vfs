@@ -12,11 +12,12 @@ var vfs = require('./localfs')({
 http.createServer(function (req, res) {
 
   function abort(err, code) {
+    console.error(err.stack);
     if (code) res.statusCode = code;
     else if (err.code === "ENOENT") res.statusCode = 404;
     else if (err.code === "EACCESS") res.statucCode = 403;
     else res.statusCode = 500;
-    message = (err.stack || err) + "\n";
+    var message = (err.stack || err) + "\n";
     res.setHeader("Content-Type", "text/plain");
     res.setHeader("Content-Length", Buffer.byteLength(message));
     res.end(message);
@@ -81,30 +82,84 @@ http.createServer(function (req, res) {
     }
 
   } // end GET request
-    
-  else if (req.method === "PUT") {
-    // TODO: Does this pause/buffer *all* events or just some?
-    req.pause();
-    vfs.createWriteStream(path, {}, function (err, meta) {
-      if (err) return abort(err);
-      if (meta.stream) {
-        meta.stream.on("error", abort);
-        req.pipe(meta.stream);
-        req.resume();
-        meta.stream.on("saved", function () {
-          res.end();
-        });
-      } else {
-        res.end();
-      }
-    });
 
+  else if (req.method === "PUT") {
+
+    if (path[path.length - 1] === "/") {
+      vfs.mkdir(path, {}, function (err, meta) {
+        if (err) return abort(err);
+        res.end();
+      });
+    } else {
+      // TODO: Does this pause/buffer *all* events or just some?
+      req.pause();
+      vfs.createWriteStream(path, {}, function (err, meta) {
+        if (err) return abort(err);
+        if (meta.stream) {
+          meta.stream.on("error", abort);
+          req.pipe(meta.stream);
+          req.resume();
+          meta.stream.on("saved", function () {
+            res.end();
+          });
+        } else {
+          res.end();
+        }
+      });
+    }
   } // end PUT request
+
+  else if (req.method === "DELETE") {
+    var command;
+    if (path[path.length - 1] === "/") {
+      command = vfs.rmdir;
+    } else {
+      command = vfs.unlink;
+    }
+    command(path, {}, function (err, meta) {
+      if (err) return abort(err);
+      res.end();
+    });
+  } // end DELETE request
+
+  else if (req.method === "POST") {
+    var data = "";
+    req.on("data", function (chunk) {
+      data += chunk;
+    });
+    req.on("end", function () {
+      var message;
+      try {
+        message = JSON.parse(data);
+      } catch (err) {
+        return abort(err);
+      }
+      var command, options = {};
+      if (message.renameFrom) {
+        command = vfs.rename;
+        options.from = message.renameFrom;
+      }
+      else if (message.copyFrom) {
+        command = vfs.copy;
+        options.from = message.copyFrom;
+      }
+      else if (message.linkTo) {
+        command = vfs.symlink;
+        options.target = message.linkTo;
+      }
+      else {
+        return abort(new Error("Invalid command in POST " + data));
+      }
+      command(path, options, function (err, meta) {
+        if (err) return abort(err);
+        res.end();
+      });
+    });
+  } // end POST commands
   else {
     return abort("Unsupported HTTP method", 501);
   }
 
-  // TODO: Atomic writes using temp file
 
 }).listen(9000, function () {
   console.log("Server listening at " + httpRoot);
