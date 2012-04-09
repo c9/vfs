@@ -25,7 +25,7 @@ function canExec(owner, inGroup, mode) {
 }
 
 function calcEtag(stat) {
-  return '"' + stat.ino.toString(36) + "-" + stat.size.toString(36) + "-" + stat.mtime.valueOf().toString(36) + '"';
+  return (stat.isFile() ? '': 'W/') + '"' + stat.ino.toString(36) + "-" + stat.size.toString(36) + "-" + stat.mtime.valueOf().toString(36) + '"';
 }
 
 
@@ -258,7 +258,7 @@ module.exports = function setup(fsOptions) {
         }
 
         // ETag support
-        meta.etag = 'W/' + calcEtag(stat);
+        meta.etag = calcEtag(stat);
         if (options.etag === meta.etag) {
           meta.notModified = true;
           return callback(null, meta);
