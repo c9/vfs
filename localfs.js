@@ -344,7 +344,7 @@ module.exports = function setup(fsOptions) {
 
   // This is used for creating / overwriting files.  It always creates a new tmp
   // file and then renamed to the final destination.
-  function createfile(path, options, callback) {
+  function mkfile(path, options, callback) {
     var meta = {};
 
     // Make sure the user has access to the directory and get the real path.
@@ -410,7 +410,7 @@ module.exports = function setup(fsOptions) {
     });
   }
 
-  // Common logic used by rmdir and unlink
+  // Common logic used by rmdir and rmfile
   function remove(path, fn, callback) {
     var meta = {};
     realpath(path, function (err, path) {
@@ -431,7 +431,7 @@ module.exports = function setup(fsOptions) {
     remove(path, fs.rmdir, callback);
   }
 
-  function unlink(path, options, callback) {
+  function rmfile(path, options, callback) {
     remove(path, fs.unlink, callback);
   }
 
@@ -464,7 +464,7 @@ module.exports = function setup(fsOptions) {
   // existing functions.
   function copy(path, options, callback) {
     var meta = {};
-    createfile(path, {}, function (err, writeMeta) {
+    mkfile(path, {}, function (err, writeMeta) {
       if (err) return callback(err);
       readfile(options.from, {}, function (err, readMeta) {
         if (err) return callback(err);
@@ -497,8 +497,8 @@ module.exports = function setup(fsOptions) {
 
   return {
     readfile: readfile,
-    createfile: createfile,
-    unlink: unlink,
+    mkfile: mkfile,
+    rmfile: rmfile,
     readdir: readdir,
     mkdir: mkdir,
     rmdir: rmdir,

@@ -18,7 +18,7 @@ When using the http adaptor, your server will expose the following interface:
 
 ## `HEAD /any/path`
 
-All HEAD requests are converted to GET requests internally and act identical, 
+All HEAD requests are converted to GET requests internally and act identical,
 except there is an internal flag in the vfs layer telling it to not stream the body.
 
 ## `GET /path/to/file`
@@ -29,19 +29,10 @@ Serve a file to the client as a stream.  Supports etags and range requests.
 
 Serve a directory listing as a JSON document.
 
-This is served as a streaming json document with a weak etag (since the order 
+This is served as a streaming json document with a weak etag (since the order
 of the entries is not defined.)  It supports conditional GET requests
-   
-The format is a JSON array with an object for each entry in the directory.  Entries contain:
 
- - name: the filename
- - path: the path relative to the vfs root
- - href: a full href to the resource (useful for the jsonview plugin to enable hyperlinking)
- - mime: the mime type of the file, this includes directories, symlinks, sockets, etc..
- - access: An integer bitfield showing the access permissions of the vfs. (4 - read, 2 - write, 1 - execute/search)
- - size: The size of the file as reported by stat
- - etag: The etag of this file or directory
- - link: (optional) The data contents of a symlink if the entry is a symlink.
+See `vfs.readdir` below for the format of the JSON.
 
 ## `PUT /path/to/file`
 
@@ -70,4 +61,142 @@ Currently this includes:
  - {"renameFrom": from} - rename a file from `from` to `target`.
  - {"copyFrom": from} - copy a file from `from` to `target`.
  - {"linkTo": data} - create a symlink at `target` containing `data`.
+
+# JavaScript Interface
+
+The various vfs implementations all follow the same JavaScript interface so that
+they are interchangable.
+
+## setup(options)
+
+At the top of the module (often the module itself) is a setup function.  This
+takes a single options object as configuration and returns a vfs instance.
+
+Available options vary by module.  See the indivual modules for specifics.
+
+Within a vfs, paths are relative to that vfs and files outside that tree cannot
+be accessed.
+
+All functions have the same signature `(path, options, callback(err, meta){})`.
+
+`path` is always the path to the resource in question.  It's a virtual path
+relative to the vfs instance.
+
+## vfs.readfile(path, options, callback)
+
+Read a file and stream it's contents.
+
+`options` can include:
+
+ - options.etag - the browser sent an If-None-Match header with etag
+ - options.head - the request was a HEAD request
+ - options.range - the request had a Range header, this object can have "start" and/or "end"
+
+`meta` in the response can include:
+
+ - meta.notModified - truthy if the server should send 304 (etag matched)
+ - meta.rangeNotSatisfiable - truthy if the server should send 416
+ - meta.partialContent - object if server should send 206 and contains "start", "end", and "size" needed for the "Content-Range" header.
+ - meta.mime - the mime type of the file
+ - meta.size - the size of the file
+ - meta.etag - the etag of the file (embeds inode, size and mtime)
+ - meta.stream - a readable stream if the response should have a body.
+
+## vfs.readdir(path, options, callback)
+
+Read a directory and get a listing of it's contents as JSON.  Note the stream is
+a data stream (already JSON serialized), not an object stream.
+
+`options` can include:
+
+ - options.etag - the browser sent an If-None-Match header with etag
+ - options.head - the request was a HEAD request
+
+`meta` in the response can include:
+
+ - meta.notModified - truthy if the server should send 304 (etag matched)
+ - meta.etag - The weak etag of the directory (embeds inode, size and mtime)
+ - meta.mime - The mime of the directory "inode/directory"
+ - meta.stream - The json stream (unless options.head was truthy)
+
+The format of the stream is a JSON array with an object for each entry in the
+directory.  Entries contain:
+
+ - name: the filename
+ - path: the path relative to the vfs root
+ - href: a full href to the resource (useful for the jsonview plugin to enable hyperlinking)
+ - mime: the mime type of the file, this includes directories, symlinks, sockets, etc..
+ - access: An integer bitfield showing the access permissions of the vfs. (4 - read, 2 - write, 1 - execute/search)
+ - size: The size of the file as reported by stat
+ - etag: The etag of this file or directory
+ - link: (optional) The data contents of a symlink if the entry is a symlink.
+
+## vfs.mkfile(path, options, callback)
+
+Saves a file stream to the vfs.  Always first creates a tmp file and then renames
+for atomic writes.
+
+There are no `options` for this function.
+
+`meta` in the response can include:
+
+ - meta.stream - a writable stream to the filesystem.
+ - meta.tmpPath - the actual filepath of the tmpfile
+
+
+## vfs.mkdir(path, options, callback)
+
+Create a directory.
+
+There are no `options` for this function.
+
+`meta` in the response is empty.
+
+## vfs.rmfile(path, options, callback)
+
+Remove a file
+
+There are no `options` for this function.
+
+`meta` in the response is empty.
+
+## vfs.rmdir(path, options, callback)
+
+Remove a directory
+
+There are no `options` for this function.
+
+`meta` in the response is empty.
+
+## vfs.rename(path, options, callback)
+
+Rename a file or directory
+
+`options` can include:
+
+ - options.from - the file we want to rename.
+
+`meta` in the response is empty.
+
+## vfs.copy(path, options, callback)
+
+Copy a file
+
+`options` can include:
+
+ - options.from - the file we want to copy from.
+
+`meta` in the response is empty.
+
+## vfs.symlink(path, options, callback)
+
+Create a symlink
+
+`options` can include:
+
+ - options.target - The data contents of the symlink
+
+`meta` in the response is empty.
+
+
 
