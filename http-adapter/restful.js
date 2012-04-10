@@ -4,13 +4,15 @@ module.exports = function setup(mount, vfs) {
 
   return function (req, res, next) {
 
-    if (!req.uri) { req.uri = urlParse(req.url); } 
+    if (!req.uri) { req.uri = urlParse(req.url); }
+
+    if (mount[mount.length - 1] !== "/") mount += "/";
 
     var path = unescape(req.uri.pathname);
     // no need to sanitize the url (remove ../..) the vfs layer has this
     // responsibility since it can do it better with realpath.
     if (path.substr(0, mount.length) !== mount) { return next(); }
-    path = path.substr(mount.length);
+    path = path.substr(mount.length - 1);
 
     // Instead of using next for errors, we send a custom response here.
     function abort(err, code) {

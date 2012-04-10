@@ -6,16 +6,18 @@ serves it via a HTTP RESTful interface.
 The module is a setup function that creates a middleware instance.
 
 ```js
+var root = "http://localhost:8080/rest/";
+
 var vfs = require('vfs-local')({
-  root: "/home/tim/creationix.com/",
-  httpRoot: "http://creationix.com:9000/",
-  uid: 1000,
-  gid: 100
+  root: process.cwd(),
+  httpRoot: root,
 });
 
 require('http').createServer(require('stack')(
-  require('vfs-http-adaptor')("/", vfs)
-)).listen(9000);
+  require('vfs-http-adapter')("/rest/", vfs)
+)).listen(8080);
+
+console.log("RESTful interface at " + root);
 ```
 
 ## `HEAD /any/path`

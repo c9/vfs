@@ -1,15 +1,17 @@
 {
   "author": "Tim Caswell <tim@c9.io>",
-  "name": "vfs-local",
-  "description": "A vfs implementation that works on the local filesystem, but with optional security constraints",
+  "name": "vfs-example",
+  "description": "A simple vfs example http server",
   "version": "0.0.0",
+  "private": true,
   "repository": {
     "type": "git",
     "url": "git://github.com/c9/vfs.git"
   },
-  "main": "localfs.js",
   "dependencies": {
-    "simple-mime": "0.0.5"
+    "stack": "~0.1.0",
+    "vfs-http-adapter": "~0.0.0",
+    "vfs-local": "~0.0.0"
   },
   "devDependencies": {},
   "optionalDependencies": {},

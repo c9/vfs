@@ -309,12 +309,15 @@ module.exports = function setup(fsOptions) {
                 }
                 entry.access = stat.access;
                 entry.size = stat.size;
-                entry.etag = calcEtag(stat);
+                if (stat.isFile() || stat.isDirectory()) {
+                  entry.etag = calcEtag(stat);
+                }
+
 
                 if (!stat.isSymbolicLink()) {
                   return send();
                 }
-                fs.readlink(path, function (err, link) {
+                fs.readlink(fullpath, function (err, link) {
                   if (err) {
                     entry.linkErr = err.stack;
                   } else {

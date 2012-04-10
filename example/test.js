@@ -1,16 +1,12 @@
-var httpRoot = "http://localhost:9000/";
-var vfs = require('./localfs')({
-  root: "/home/tim/",
-  httpRoot: httpRoot,
-  uid: 1000,
-  gid: 100
+var root = "http://localhost:8080/rest/";
+
+var vfs = require('vfs-local')({
+  root: process.cwd(),
+  httpRoot: root,
 });
 
+require('http').createServer(require('stack')(
+  require('vfs-http-adapter')("/rest/", vfs)
+)).listen(8080);
 
-// TODO: convert this file to middleware module
-http.createServer(function (req, res) {
-
-
-}).listen(9000, function () {
-  console.log("Server listening at " + httpRoot);
-});
+console.log("RESTful interface at " + root);
