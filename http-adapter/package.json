@@ -1,0 +1,17 @@
+{
+  "author": "Tim Caswell <tim@c9.io>",
+  "name": "vfs-http-adapter",
+  "description": "A http middleware to wrap vfs instances and expose them via a RESTful interface",
+  "version": "0.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/c9/vfs.git"
+  },
+  "main": "restful.js",
+  "dependencies": {},
+  "devDependencies": {},
+  "optionalDependencies": {},
+  "engines": {
+    "node": "*"
+  }
+}
