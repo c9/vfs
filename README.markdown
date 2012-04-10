@@ -90,7 +90,7 @@ Read a file and stream it's contents.
 
  - options.etag - the browser sent an If-None-Match header with etag
  - options.head - the request was a HEAD request
- - options.range - the request had a Range header, this object can have "start" and/or "end"
+ - options.range - the request had a Range header, this object can have "start", "end" and/or "etag".
 
 `meta` in the response can include:
 
