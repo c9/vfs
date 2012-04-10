@@ -9,6 +9,8 @@ var vfs = require('./localfs')({
   gid: 100
 });
 
+
+// TODO: convert this file to middleware module
 http.createServer(function (req, res) {
 
   function abort(err, code) {
