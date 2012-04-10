@@ -1,7 +1,8 @@
 # VFS - Virtual File System
 
 This module is a vfs implementation for node.js.  Originally it was created for
-our internal needs at Cloud9IDE, but grew to be generally useful.
+our internal needs at Cloud9IDE.  Eventually it grew to be generally useful so
+we're releasing it here as a general purpose vfs system.
 
 The basic use case for this system is to expose a common http friendly, streaming,
 filesystem interface.  It's doesn't assume http and can be used in other contexts,
