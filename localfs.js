@@ -173,7 +173,7 @@ module.exports = function setup(fsOptions) {
   //   options.etag - the browser sent an If-None-Match header with etag
   //   options.head - the request was a HEAD request
   //   options.range - the request had a Range header, this object can have
-  //                   "start" and/or "end"
+  //                   "start", "end" and/or "etag"
   // @path is relative to the fsOptions.root setting in this vfs instance
   // @callback is `function (err, meta) {...}`
   //   err is truthy if there is a server error and the browser should send 500,
