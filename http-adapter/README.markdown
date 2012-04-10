@@ -13,7 +13,7 @@ var vfs = require('vfs-local')({
   gid: 100
 });
 
-http.createServer(Stack(
+require('http').createServer(require('stack')(
   require('vfs-http-adaptor')("/", vfs)
 )).listen(9000);
 ```
