@@ -1,7 +1,22 @@
-# The REST interface.
+# HTTP adaptor
 
 This module is a connect/stack middleware module that wraps a vfs instance and
 serves it via a HTTP RESTful interface.
+
+The module is a setup function that creates a middleware instance.
+
+```js
+var vfs = require('vfs-local')({
+  root: "/home/tim/creationix.com/",
+  httpRoot: "http://creationix.com:9000/",
+  uid: 1000,
+  gid: 100
+});
+
+http.createServer(Stack(
+  require('vfs-http-adaptor')("/", vfs)
+)).listen(9000);
+```
 
 ## `HEAD /any/path`
 
