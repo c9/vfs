@@ -19,7 +19,8 @@ module.exports = function setup(mount, vfs) {
       console.error(err.stack);
       if (code) res.statusCode = code;
       else if (err.code === "ENOENT") res.statusCode = 404;
-      else if (err.code === "EACCESS") res.statucCode = 403;
+      else if (err.code === "EACCESS") res.statusCode = 403;
+      else if (err.code === "ENOTREADY") res.statusCode = 503;
       else res.statusCode = 500;
       var message = (err.stack || err) + "\n";
       res.setHeader("Content-Type", "text/plain");

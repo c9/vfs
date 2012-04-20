@@ -1,16 +1,17 @@
 {
   "author": "Tim Caswell <tim@c9.io>",
-  "name": "vfs-ssh",
-  "description": "A ssh based implementation that provides a virtual filesystem by using a remote node process tunneled over ssh.",
+  "name": "vfs-child",
+  "description": "A vfs that runs in a child process.",
   "version": "0.0.0",
   "repository": {
     "type": "git",
     "url": "git://github.com/c9/vfs.git"
   },
-  "main": "master-agent.js",
+  "main": "parent.js",
   "dependencies": {
     "architect-agent": "~0.2.1",
-    "architect-socket-transport": "~0.2.1"
+    "architect-socket-transport": "~0.2.1",
+    "vfs-socket": "~0.0.0"
   },
   "devDependencies": {},
   "optionalDependencies": {},

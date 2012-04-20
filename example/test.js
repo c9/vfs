@@ -1,6 +1,6 @@
 var root = "http://localhost:8080/rest/";
 
-var vfs = require('vfs-local')({
+var vfs = require('vfs-child')({
   root: process.cwd(),
   httpRoot: root,
 });

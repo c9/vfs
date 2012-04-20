@@ -28,7 +28,6 @@ function calcEtag(stat) {
   return (stat.isFile() ? '': 'W/') + '"' + stat.ino.toString(36) + "-" + stat.size.toString(36) + "-" + stat.mtime.valueOf().toString(36) + '"';
 }
 
-
 // @fsOptions can have:
 //   fsOptions.uid - restricts access as if this user was running as
 //   fsOptions.gid   this uid/gid, create files as this user.
@@ -56,6 +55,18 @@ module.exports = function setup(fsOptions) {
     fsUid = process.getuid();
     fsGid = process.getgid();
   }
+
+  return {
+    readfile: readfile,
+    mkfile: mkfile,
+    rmfile: rmfile,
+    readdir: readdir,
+    mkdir: mkdir,
+    rmdir: rmdir,
+    rename: rename,
+    copy: copy,
+    symlink: symlink
+  };
 
   // Give this a stat object (or any object containing uid, gid, and mode) and
   // it will tell you what permissions the current fs instance has as a number.
@@ -497,17 +508,4 @@ module.exports = function setup(fsOptions) {
       });
     });
   }
-
-  return {
-    readfile: readfile,
-    mkfile: mkfile,
-    rmfile: rmfile,
-    readdir: readdir,
-    mkdir: mkdir,
-    rmdir: rmdir,
-    rename: rename,
-    copy: copy,
-    symlink: symlink
-  };
-
 };
