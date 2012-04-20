@@ -16,7 +16,7 @@ module.exports = function setup(mount, vfs) {
 
     // Instead of using next for errors, we send a custom response here.
     function abort(err, code) {
-      console.error(err.stack);
+      console.error(err.stack || err);
       if (code) res.statusCode = code;
       else if (err.code === "ENOENT") res.statusCode = 404;
       else if (err.code === "EACCESS") res.statusCode = 403;
