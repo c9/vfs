@@ -1,13 +1,19 @@
 var socketTransport = require('architect-socket-transport');
 var Agent = require('architect-agent').Agent;
 var spawn = require('child_process').spawn;
+var Pipe;
 
 module.exports = function setup(fsOptions) {
-    var child = spawn(process.execPath, [require.resolve('./child.js'), JSON.stringify(fsOptions)]);
+    if (!Pipe) Pipe = process.binding('pipe_wrap').Pipe;
+
+    var child = spawn(process.execPath, [require.resolve('./child.js'), JSON.stringify(fsOptions)], {
+        customFds: [-1, 1, 2],
+        stdinStream: new Pipe(true)
+    });
 
     var agent = new Agent({});
     var vfs;
-    agent.attach(socketTransport(child.stdout, child.stdin), function (realVfs) {
+    agent.attach(socketTransport(child.stdin), function (realVfs) {
         // Set the real vfs object
         vfs = realVfs;
         // Replace all properties on the returned one as well
@@ -15,6 +21,7 @@ module.exports = function setup(fsOptions) {
             obj[key] = vfs[key];
         }
     });
+    child.stdin.resume();
 
     // Return fake endpoints in the initial return till we have the real ones.
     function wait(name) {
