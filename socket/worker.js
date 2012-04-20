@@ -14,8 +14,34 @@ module.exports = function setup(fsOptions) {
   var output = fsOptions.hasOwnProperty("output") ? fsOptions.output : input;
   if (!(output instanceof Stream && output.writable !== false)) throw new TypeError("output must be a writable Stream");
 
+
+  function wrap(fn, name) {
+    return function wrapped(path, options, callback) {
+      // console.log(name, path, options);
+      fn(path, options, function (err, meta) {
+        // console.error(name, err, meta);
+        if (meta.stream) {
+          err = new Error("STREAM!");
+        }
+        if (err) {
+          var nerr = {
+            stack: process.pid + ": " + err.stack
+          }
+          if (err.hasOwnProperty("code")) nerr.code = err.code;
+          if (err.hasOwnProperty("message")) nerr.message = err.message;
+          console.log("nerr", nerr);
+          return callback(nerr);
+        }
+        callback(null, meta);
+      });
+    }
+  }
+
+  // Get the local vfs and wrap it so we can fix streams
   var vfs = vfsLocal(fsOptions);
-  // TODO: fix streams
+  for (var key in vfs) {
+    vfs[key] = wrap(vfs[key], key);
+  }
 
   var agent = new Agent(vfs);
   agent.attach(socketTransport(input, output), function (parent) {
