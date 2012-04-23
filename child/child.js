@@ -2,5 +2,5 @@
 // config options from argv[2].
 var config = JSON.parse(process.argv[2]);
 config.input = process.stdin;
-require('vfs-socket')(config);
+require('vfs-socket/worker')(config);
 process.stdin.resume();

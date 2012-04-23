@@ -1,21 +1,19 @@
 {
-  "author": "Tim Caswell <tim@c9.io>",
-  "name": "vfs-child",
-  "description": "A vfs that runs in a child process.",
-  "version": "0.0.0",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/c9/vfs.git"
-  },
-  "main": "parent.js",
-  "dependencies": {
-    "architect-agent": "~0.2.1",
-    "architect-socket-transport": "~0.2.1",
-    "vfs-socket": "~0.0.0"
-  },
-  "devDependencies": {},
-  "optionalDependencies": {},
-  "engines": {
-    "node": "*"
-  }
+    "author": "Tim Caswell <tim@c9.io>",
+    "name": "vfs-child",
+    "description": "A vfs that runs in a child process.",
+    "version": "0.0.0",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/c9/vfs.git"
+    },
+    "main": "parent.js",
+    "dependencies": {
+        "vfs-socket": "~0.0.0"
+    },
+    "devDependencies": {},
+    "optionalDependencies": {},
+    "engines": {
+        "node": "*"
+    }
 }
