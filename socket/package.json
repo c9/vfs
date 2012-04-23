@@ -1,21 +1,20 @@
 {
-  "author": "Tim Caswell <tim@c9.io>",
-  "name": "vfs-socket",
-  "description": "A vfs layer that communicates through a serialized socket",
-  "version": "0.0.0",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/c9/vfs.git"
-  },
-  "main": "worker.js",
-  "dependencies": {
-    "architect-agent": "~0.2.1",
-    "architect-socket-transport": "~0.2.1",
-    "vfs-local": "~0.0.0"
-  },
-  "devDependencies": {},
-  "optionalDependencies": {},
-  "engines": {
-    "node": "*"
-  }
+    "author": "Tim Caswell <tim@c9.io>",
+    "name": "vfs-socket",
+    "description": "A vfs layer that communicates through a serialized socket",
+    "version": "0.0.0",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/c9/vfs.git"
+    },
+    "dependencies": {
+        "architect-agent": "~0.2.1",
+        "architect-socket-transport": "~0.2.1",
+        "vfs-local": "~0.0.0"
+    },
+    "devDependencies": {},
+    "optionalDependencies": {},
+    "engines": {
+        "node": "*"
+    }
 }
