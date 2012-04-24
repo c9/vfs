@@ -71,8 +71,7 @@ module.exports = function setup(fsOptions) {
     // Share stderr with parent to enable debugging
     var options = { customFds: [-1, -1, 2] };
 
-    var child = spawn(process.execPath, ["-e", bootstrap], options);
-    // var child = spawn("ssh", args, options);
+    var child = spawn("ssh", args, options);
 
     var code = libCode + "\nrequire('vfs-ssh/slave')(" + JSON.stringify(fsOptions) + ");\n";
     child.stdin.write(code + "\0");
