@@ -258,8 +258,6 @@ module.exports = function setup(fsOptions) {
 
   // Reads a directory and streams data about the files as json.
   // The order of the files in undefined.  The client should sort afterwards.
-  // TODO: we need to throttle the parallel stat calls.  This won't scale to thousands.
-  // TODO: Implement tcp backpressure so we don't write faster than the client can receive and be forced to buffer in ram.
   function readdir(path, options, callback) {
     var meta = {};
 
@@ -287,13 +285,27 @@ module.exports = function setup(fsOptions) {
           }
           var stream = new Stream();
           stream.readable = true;
+          var paused;
+          stream.pause = function () {
+            if (paused === true) return;
+            paused = true;
+          };
+          stream.resume = function () {
+            if (paused === false) return;
+            paused = false;
+            getNext();
+          };
           meta.stream = stream;
           callback(null, meta);
           stream.emit("data", "[");
-          var left = files.length;
-          files.forEach(function (file) {
+          var index = 0;
+          stream.resume();
+          function getNext() {
+            if (index === files.length) return done();
+            var file = files[index++];
+            var left = files.length - index;
             var fullpath = join(path, file);
-            var filepath = fullpath.substr(base.length);
+            filepath = fullpath.substr(base.length);
             if (filepath[0] !== "/") filepath = "/" + filepath;
             lstatSafe(fullpath, 0, function (err, stat) {
               var entry = {
@@ -341,18 +353,16 @@ module.exports = function setup(fsOptions) {
                 });
               }
               function send() {
-                left--;
-                stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
-                check();
+                var ret = stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
+                if (!paused) {
+                  getNext();
+                }
               }
             });
-          });
-          check();
-          function check() {
-            if (!left) {
-              stream.emit("data", "\n]\n");
-              stream.emit("end");
-            }
+          }
+          function done() {
+            stream.emit("data", "\n]\n");
+            stream.emit("end");
           }
         });
       });
