@@ -64,8 +64,7 @@ module.exports = function setup(fsOptions) {
       args.push("-i");
       args.push(options.key);
     }
-    args.push("-C");
-    args.push(nodePath + ' -e "' + bootstrap + '"');
+    args.push("-C", nodePath + ' -e "' + bootstrap + '"');
 
     // Share stderr with parent to enable debugging
     var options = { customFds: [-1, -1, 2] };
