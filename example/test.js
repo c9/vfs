@@ -1,12 +1,15 @@
-var root = "http://localhost:8080/rest/";
+var port = 5000;
+var root = "http://creationix.com:" + port + "/rest/";
 
-var vfs = require('vfs-child')({
-  root: process.cwd() + "/",
+var vfs = require('vfs-ssh')({
+  host: "creationix.com",
+  user: "tim",
+  root: "/home/tim/creationix.com/",
   httpRoot: root,
 });
 
 require('http').createServer(require('stack')(
   require('vfs-http-adapter')("/rest/", vfs)
-)).listen(8080);
+)).listen(port);
 
 console.log("RESTful interface at " + root);
