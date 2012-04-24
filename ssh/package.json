@@ -10,7 +10,7 @@
   "main": "master.js",
   "dependencies": {
     "vfs-socket": "~0.0.0",
-    "embedder": "~0.0.2"
+    "embedder-sync": "~0.0.0"
   },
   "devDependencies": {},
   "optionalDependencies": {},
