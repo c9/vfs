@@ -39,7 +39,6 @@ var bootstrap = ("(" + function () {
     } catch (err) {
         console.error(err.stack);
     }
-    console.error(process.pid, 'left', left);
     if (left.length) process.stdin.emit('data', left);
   }
 
