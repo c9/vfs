@@ -29,7 +29,13 @@ module.exports = function setup(fsOptions) {
         streams[id] = stream;
         if (stream.readable) {
             stream.on("data", function (chunk) {
-                remote.onData(id, chunk);
+                var ret = remote.send(["onData", id, chunk], function () {
+                    if (ret ===  false) {
+                        throw new Error("WOOP!");
+                        stream.resume();
+                    }
+                });
+                if (ret === false) stream.pause();
             });
             stream.on("end", function () {
                 remote.onEnd(id);
