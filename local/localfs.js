@@ -36,8 +36,10 @@ function calcEtag(stat) {
 //   fsOptions.skipSearchCheck - Skip the folder execute/search permission check on file open.
 //   fsOptions.httpRoot - used for generating links in directory listing.  It's where this fs is mounted over http.
 module.exports = function setup(fsOptions) {
-  var root = fsOptions.root || "/";
-  if (root[root.length - 1] !== "/") root += "/";
+  var root = fsOptions.root;
+  if (!root) throw new Error("root is a required option");
+  if (root[root.length - 1] !== "/") throw new Error("root path must end in /");
+  if (root[0] !== "/") throw new Error("root path must start in /");
   var base = root.substr(0, root.length - 1);
 
   var umask = fsOptions.umask || 0750;
@@ -51,6 +53,7 @@ module.exports = function setup(fsOptions) {
     fsUid = fsOptions.uid || process.getuid();
     fsGid = fsOptions.gid || process.getgid();
   } else {
+    if (process.getuid() === 0) throw new Error("Please specify uid or gid when running as root");
     // The process represents itself
     fsUid = process.getuid();
     fsGid = process.getgid();
@@ -75,8 +78,8 @@ module.exports = function setup(fsOptions) {
     var owner = fsUid > 0 ? fsUid === stat.uid : true;
     var group = fsGid > 0 ? fsGid === stat.gid : true;
     var mode = stat.mode;
-    return (canRead(owner, group, mode) ? 4 : 0) +
-          (canWrite(owner, group, mode) ? 2 : 0) +
+    return (canRead(owner, group, mode) ? 4 : 0) |
+          (canWrite(owner, group, mode) ? 2 : 0) |
            (canExec(owner, group, mode) ? 1 : 0);
   }
 
@@ -84,7 +87,7 @@ module.exports = function setup(fsOptions) {
   // It recursivly checks for the execute/search bit on all parent directories.
   function pathAccess(path, callback) {
     var dir = dirname(path);
-    if (!checkPermissions || fsUid === 0 || fsUid === 0 || fsOptions.skipSearchCheck) {
+    if (!checkPermissions || fsUid === 0 || fsGid === 0 || fsOptions.skipSearchCheck) {
       return callback(null, true);
     }
     fs.stat(dir, function (err, stat) {
@@ -389,7 +392,12 @@ module.exports = function setup(fsOptions) {
         }
         function onCreate() {
           var stream = new fs.WriteStream(path, options);
+          var hadError;
+          stream.once('error', function () {
+            hadError = true;
+          });
           stream.on('close', function () {
+            if (hadError) return;
             fs.rename(tmpPath, path, function (err) {
               if (err) return stream.emit("error", err);
               stream.emit("saved");
@@ -430,7 +438,7 @@ module.exports = function setup(fsOptions) {
     realpath(path, function (err, path) {
       if (err) return callback(err);
       // Make sure the user can modify the directory contents
-      statSafe(dirname(path), 2, function (err) {
+      statSafe(dirname(path), 2/*WRITE*/, function (err) {
         if (err) return callback(err);
         fn(path, function (err) {
           if (err) return callback(err);
@@ -455,13 +463,13 @@ module.exports = function setup(fsOptions) {
     realpath(dirname(path), function (err, dir) {
       if (err) return callback(err);
       // Make sure the user can modify the target directory
-      statSafe(dir, 2, function (err) {
+      statSafe(dir, 2/*WRITE*/, function (err) {
         if (err) return callback(err);
         // Make sure the source file is accessable
         realpath(options.from, function (err, from) {
           if (err) return callback(err);
           // Make sure the user can modify the source directory
-          statSafe(dirname(from), 2, function (err) {
+          statSafe(dirname(from), 2/*WRITE*/, function (err) {
             if (err) return callback(err);
             // Rename the file
             fs.rename(from, join(dir, basename(path)), function (err) {
@@ -492,8 +500,6 @@ module.exports = function setup(fsOptions) {
   }
 
   function symlink(path, options, callback) {
-    // TODO: possibly add optional feature to convert virtual absolute targets
-    // to relative links.
     var meta = {};
     // Get real path to target dir
     realpath(dirname(path), function (err, dir) {
