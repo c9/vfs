@@ -309,14 +309,16 @@ module.exports = function setup(fsOptions) {
             if (filepath[0] !== "/") filepath = "/" + filepath;
             lstatSafe(fullpath, 0, function (err, stat) {
               var entry = {
-                name: file,
-                path: filepath
+                name: file
               };
 
               if (err) {
                 entry.err = err.stack || err;
                 return send();
               } else {
+                entry.access = stat.access;
+                entry.size = stat.size;
+
                 if (stat.isDirectory()) {
                   entry.mime = "inode/directory";
                   if (fsOptions.httpRoot) {
@@ -333,12 +335,6 @@ module.exports = function setup(fsOptions) {
                     entry.href = fsOptions.httpRoot + filepath.substr(1);
                   }
                 }
-                entry.access = stat.access;
-                entry.size = stat.size;
-                if (stat.isFile() || stat.isDirectory()) {
-                  entry.etag = calcEtag(stat);
-                }
-
 
                 if (!stat.isSymbolicLink()) {
                   return send();
