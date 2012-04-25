@@ -30,10 +30,7 @@ module.exports = function setup(fsOptions) {
         if (stream.readable) {
             stream.on("data", function (chunk) {
                 var ret = remote.send(["onData", id, chunk], function () {
-                    if (ret ===  false) {
-                        throw new Error("WOOP!");
-                        stream.resume();
-                    }
+                    stream.resume();
                 });
                 if (ret === false) stream.pause();
             });
