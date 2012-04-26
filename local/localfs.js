@@ -29,6 +29,9 @@ function calcEtag(stat) {
   return (stat.isFile() ? '': 'W/') + '"' + stat.ino.toString(36) + "-" + stat.size.toString(36) + "-" + stat.mtime.valueOf().toString(36) + '"';
 }
 
+// TODO: remove these three functions (bashEscape, getUsername, getGroupname)
+// once node has uid/gid fixed for childProcess.spawn()
+
 // Implement bash string escaping.
 var safePattern =    /^[a-z0-9_\/\-.,?:@#%^+=\[\]]*$/i; // These Don't need quoting
 var safeishPattern = /^[a-z0-9_\/\-.,?:@#%^+=\[\]{}|&()<>; *']*$/i; // These are fine with double quotes
@@ -40,6 +43,27 @@ function bashEscape(arg) {
       return "'\"" + val + "\"'";
     }) + "'";
 }
+
+var usernames = {};
+function getUsername(uid, callback) {
+  if (usernames[uid]) return callback(null, usernames[uid]);
+    childProcess.exec("getent passwd " + uid, function (err, stdout, stderr) {
+      if (err) return callback(err);
+      usernames[uid] = stdout.substr(0, stdout.indexOf(":"));
+      callback(null, usernames[uid]);
+    });
+}
+
+var groupnames = {};
+function getGroupname(gid, callback) {
+  if (groupnames[gid]) return callback(null, groupnames[gid]);
+    childProcess.exec("getent group " + gid, function (err, stdout, stderr) {
+      if (err) return callback(err);
+      groupnames[gid] = stdout.substr(0, stdout.indexOf(":"));
+      callback(null, groupnames[gid]);
+    });
+}
+
 
 // @fsOptions can have:
 //   fsOptions.uid - restricts access as if this user was running as
@@ -57,27 +81,11 @@ module.exports = function setup(fsOptions) {
 
   var umask = fsOptions.umask || 0750;
   var checkPermissions, fsUid, fsGid;
-  var username, groupname;
   if (fsOptions.hasOwnProperty("uid") || fsOptions.hasOwnProperty("gid")) {
     if (typeof fsOptions.uid === "number" || typeof fsOptions.uid === "number") {
-
       checkPermissions = true; // Tell the system to not assume anything.
       fsUid = fsOptions.uid || process.getuid();
       fsGid = fsOptions.gid || process.getgid();
-
-      // TODO: Remove this hack when node is fixed! Node's spawn is broken and
-      // doesn't accept uid/gid so we need to get the username and groupname to
-      // shell out to `su` and `sg` when spawning a process!
-      if (fsOptions.hasOwnProperty('uid')) {
-        childProcess.exec("getent passwd " + fsUid, function (err, stdout, stderr) {
-          username = stdout.substr(0, stdout.indexOf(":"));
-        });
-      }
-      if (fsOptions.hasOwnProperty('gid')) {
-        childProcess.exec("getent group " + fsGid, function (err, stdout, stderr) {
-          groupname = stdout.substr(0, stdout.indexOf(":"));
-        });
-      }
     }
   } else {
     if (process.getuid() === 0) throw new Error("Please specify uid or gid when running as root");
@@ -224,34 +232,39 @@ module.exports = function setup(fsOptions) {
     // TODO: Remove when node is fixed
     // if node doesn't fix it's uid/gid options we'll need to escape all arguments and use "su -c" and "sg -c"
     if (options.hasOwnProperty('uid')) {
-      if (!username) {
-        var err = new Error("ENOTREADY: username not known yet");
-        err.code = "ENOTREADY";
-        return callback(err);
-      }
-      args.unshift(executablePath);
-      executablePath = "/bin/su";
-      args = ["-c", args.map(bashEscape).join(" "), username];
+      getUsername(options.uid, function (err, username) {
+        if (err) return callback(err);
+        args.unshift(executablePath);
+        executablePath = "/bin/su";
+        args = ["-c", args.map(bashEscape).join(" "), username];
+        checkgid();
+      });
+    } else {
+      checkgid();
     }
 
-    if (options.hasOwnProperty('gid')) {
-      if (!groupname) {
-        var err = new Error("ENOTREADY: groupname not known yet");
-        err.code = "ENOTREADY";
-        return callback(err);
+    function checkgid() {
+      if (options.hasOwnProperty('gid')) {
+        getGroupname(options.gid, function (err, groupname) {
+          args.unshift(executablePath);
+          executablePath = "/usr/bin/sg";
+          args = [groupname, "-c", args.map(bashEscape).join(" ")];
+          dospawn();
+        });
+      } else {
+        dospawn();
       }
-      args.unshift(executablePath);
-      executablePath = "/usr/bin/sg";
-      args = [groupname, "-c", args.map(bashEscape).join(" ")];
     }
 
-    // console.log(executablePath, args.map(bashEscape).join(" "));
+    function dospawn() {
+      console.log(executablePath, args.map(bashEscape).join(" "));
 
-    var child = childProcess.spawn(executablePath, args, options);
-    if (options.resumeStdin) child.stdin.resume();
-    callback(null, {
-      child: child
-    });
+      var child = childProcess.spawn(executablePath, args, options);
+      if (options.resumeStdin) child.stdin.resume();
+      callback(null, {
+        child: child
+      });
+    }
   }
 
   function connect(executablePath, options, callback) {
