@@ -1,4 +1,5 @@
 var fs = require('fs');
+var childProcess = require('child_process');
 var constants = require('constants');
 var join = require('path').join;
 var dirname = require('path').dirname;
@@ -28,6 +29,18 @@ function calcEtag(stat) {
   return (stat.isFile() ? '': 'W/') + '"' + stat.ino.toString(36) + "-" + stat.size.toString(36) + "-" + stat.mtime.valueOf().toString(36) + '"';
 }
 
+// Implement bash string escaping.
+var safePattern = /^[a-z0-9_\/\-]*$/i; // These Don't need quoting
+var safeishPattern = /^[a-z0-9_\/\- *']*$/i; // These are fine with double quotes
+function bashEscape(arg) {
+    if (safePattern.test(arg)) return arg;
+    if (safeishPattern.test(arg)) return '"' + arg + '"';
+    return "'" + arg.replace(/'+/g, function (val) {
+      if (val.length < 3) return "'" + val.replace(/'/g, "\\'") + "'";
+      return "'\"" + val + "\"'";
+    }) + "'";
+}
+
 // @fsOptions can have:
 //   fsOptions.uid - restricts access as if this user was running as
 //   fsOptions.gid   this uid/gid, create files as this user.
@@ -44,6 +57,7 @@ module.exports = function setup(fsOptions) {
 
   var umask = fsOptions.umask || 0750;
   var checkPermissions, fsUid, fsGid;
+  var username, groupname;
   if (fsOptions.hasOwnProperty("uid") || fsOptions.hasOwnProperty("gid")) {
     // The process is running as root, but wants to simulate another user.
     if (process.getuid() > 0) {
@@ -52,6 +66,21 @@ module.exports = function setup(fsOptions) {
     checkPermissions = true; // Tell the system to not assume anything.
     fsUid = fsOptions.uid || process.getuid();
     fsGid = fsOptions.gid || process.getgid();
+
+    // TODO: Remove this hack when node is fixed! Node's spawn is broken and
+    // doesn't accept uid/gid so we need to get the username and groupname to
+    // shell out to `su` and `sg` when spawning a process!
+    if (fsOptions.uid) {
+      childProcess.exec("getent passwd " + fsUid, function (err, stdout, stderr) {
+        username = stdout.substr(0, stdout.indexOf(":"));
+      });
+    }
+    if (fsOptions.gid) {
+      childProcess.exec("getent group " + fsGid, function (err, stdout, stderr) {
+        groupname = stdout.substr(0, stdout.indexOf(":"));
+      });
+    }
+
   } else {
     if (process.getuid() === 0) throw new Error("Please specify uid or gid when running as root");
     // The process represents itself
@@ -60,6 +89,13 @@ module.exports = function setup(fsOptions) {
   }
 
   return {
+    // Process Management
+    spawn: spawn,
+
+    // Network tunnel
+    connect: connect,
+
+    // FS management
     readfile: readfile,
     mkfile: mkfile,
     rmfile: rmfile,
@@ -178,6 +214,54 @@ module.exports = function setup(fsOptions) {
     });
   }
 
+  function spawn(executablePath, options, callback) {
+    var args = options.args || [];
+    if (checkPermissions && fsOptions.hasOwnProperty('uid')) {
+      options.uid = fsOptions.uid;
+    }
+    if (checkPermissions && fsOptions.hasOwnProperty('gid')) {
+      options.gid = fsOptions.gid;
+    }
+
+    // TODO: Remove when node is fixed
+    // if node doesn't fix it's uid/gid options we'll need to escape all arguments and use "su -c" and "sg -c"
+    if (options.hasOwnProperty('gid')) {
+      if (!groupname) {
+        var err = new Error("ENOTREADY: groupname not known yet");
+        err.code = "ENOTREADY";
+        return callback(err);
+      }
+      args.unshift(executablePath);
+      executablePath = "/usr/bin/sg";
+      args = [groupname, "-c", args.map(bashEscape).join(" ")];
+    }
+
+    if (options.hasOwnProperty('uid')) {
+      if (!username) {
+        var err = new Error("ENOTREADY: username not known yet");
+        err.code = "ENOTREADY";
+        return callback(err);
+      }
+      args.unshift(executablePath);
+      executablePath = "/bin/su";
+      args = ["-c", args.map(bashEscape).join(" "), username];
+    }
+
+    console.log(executablePath, args.map(bashEscape).join(" "));
+
+    var child = childProcess.spawn(executablePath, args, options);
+    if (options.resumeStdin) child.stdin.resume();
+    callback(null, {
+      child: child
+    });
+  }
+
+  function connect(executablePath, options, callback) {
+    // TODO: Implement retry logic
+    // options.retry
+    // options.retryDelay
+    throw new Error("Not Implemented");
+  }
 
   // Like fs.createReadStream, except with added HTTP-like options.
   // Doesn't return a stream immedietly, but as a "stream" option in the meta
@@ -521,3 +605,4 @@ module.exports = function setup(fsOptions) {
     });
   }
 };
+
