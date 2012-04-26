@@ -16,6 +16,7 @@ module.exports = function setup(fsOptions) {
     if (!(output instanceof Stream && output.writable !== false)) throw new TypeError("output must be a writable Stream");
 
     var streams = {};
+    var processes = {};
     var remote;
 
     var nextID = 1;
@@ -27,6 +28,7 @@ module.exports = function setup(fsOptions) {
     function storeStream(stream) {
         var id = getID();
         streams[id] = stream;
+        stream.id = id;
         if (stream.readable) {
             stream.on("data", function (chunk) {
                 var ret = remote.send(["onData", id, chunk], function () {
@@ -46,6 +48,23 @@ module.exports = function setup(fsOptions) {
         return token;
     }
 
+    function storeProcess(process) {
+        var pid = process.pid;
+        processes[pid] = process;
+        process.on("exit", function (code, signal) {
+            remote.onExit(pid, code, signal);
+            delete processes[pid];
+            delete streams[process.stdout.id];
+            delete streams[process.stderr.id];
+            delete streams[process.stdin.id];
+        });
+        var token = {pid: pid};
+        token.stdin = storeStream(process.stdin);
+        token.stdout = storeStream(process.stdout);
+        token.stderr = storeStream(process.stderr);
+        return token;
+    }
+
     // Remote side writing to our local writable streams
     function write(id, chunk) {
         // They want to write to our real stream
@@ -57,6 +76,11 @@ module.exports = function setup(fsOptions) {
         stream.end(chunk);
         delete streams[id];
         nextID = id;
+    }
+
+    function kill(pid, code) {
+        var process = processes[pid];
+        process.kill(code);
     }
 
     function route(name) {
@@ -71,12 +95,14 @@ module.exports = function setup(fsOptions) {
                     }
                     if (err.hasOwnProperty("code")) nerr.code = err.code;
                     if (err.hasOwnProperty("message")) nerr.message = err.message;
-                    console.log("nerr", nerr);
                     return callback(nerr);
                 }
                 // Replace streams with tokens
                 if (meta.stream) {
                     meta.stream = storeStream(meta.stream);
+                }
+                if (meta.process) {
+                    meta.process = storeProcess(meta.process);
                 }
                 // Call the remote callback with the result
                 callback(null, meta);
@@ -91,7 +117,10 @@ module.exports = function setup(fsOptions) {
         // And stream endpoints for writable streams to receive their data
         write: write,
         end: end,
+        kill: kill,
         // Route other calls to the local vfs instance
+        spawn: route("spawn"),
+        connect: route("connect"),
         readfile: route("readfile"),
         mkfile: route("mkfile"),
         rmfile: route("rmfile"),

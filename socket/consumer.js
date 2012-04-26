@@ -1,6 +1,7 @@
 var socketTransport = require('architect-socket-transport');
 var Agent = require('architect-agent').Agent;
 var Stream = require('stream').Stream;
+var EventEmitter = require('events').EventEmitter;
 
 // @fsOptions can have:
 //   fsOptions.input - input stream
@@ -13,11 +14,14 @@ module.exports = function setup(fsOptions) {
     if (!(output instanceof Stream && output.writable !== false)) throw new TypeError("output must be a writable Stream");
 
     var proxyStreams = {}; // Stream proxies given us by the other side
+    var proxyProcesses = {};
+    var remote;
 
     // options.id, options.readable, options.writable
     function makeStreamProxy(token) {
         var stream = new Stream();
         var id = token.id;
+        stream.id = id;
         proxyStreams[id] = stream;
         if (token.hasOwnProperty("readable")) stream.readable = token.readable;
         if (token.hasOwnProperty("writable")) stream.writable = token.writable;
@@ -39,6 +43,29 @@ module.exports = function setup(fsOptions) {
         return stream;
     }
 
+    function makeProcessProxy(token) {
+        var process = new EventEmitter();
+        var pid = token.pid;
+        process.pid = pid;
+        proxyProcesses[pid] = process;
+        process.stdout = makeStreamProxy(token.stdout);
+        process.stderr = makeStreamProxy(token.stderr);
+        process.stdin = makeStreamProxy(token.stdin);
+        process.kill = function (signal) {
+            remote.kill(pid, signal);
+        };
+        return process;
+    }
+
+    function onExit(pid, code, signal) {
+        var process = proxyProcesses[pid];
+        process.emit("exit", code, signal);
+        delete proxyProcesses[pid];
+        delete proxyStreams[process.stdout.id];
+        delete proxyStreams[process.stderr.id];
+        delete proxyStreams[process.stdin.id];
+    }
+
     // Remote readable stream emitting to local proxy stream
     function onData(id, chunk) {
         var stream = proxyStreams[id];
@@ -51,25 +78,28 @@ module.exports = function setup(fsOptions) {
     }
     
     var agent = new Agent({
+        onExit: onExit,
         onData: onData,
-        onEnd: onEnd
+        onEnd: onEnd,
     });
 
     // Load the worker vfs using the socket.
-    var vfs;
     agent.attach(socketTransport(input, output), function (worker) {
-        vfs = worker;
+        remote = worker;
         if (fsOptions.callback) fsOptions.callback(worker);
     });
 
     // Return fake endpoints in the initial return till we have the real ones.
     function route(name) {
         return function (path, options, callback) {
-            if (vfs) {
-                return vfs[name].call(this, path, options, function (err, meta) {
+            if (remote) {
+                return remote[name].call(this, path, options, function (err, meta) {
                     if (err) return callback(err);
                     if (meta.stream) {
                         meta.stream = makeStreamProxy(meta.stream);
+                    }
+                    if (meta.process) {
+                        meta.process = makeProcessProxy(meta.process);
                     }
                     return callback(null, meta);
                 });
@@ -80,6 +110,8 @@ module.exports = function setup(fsOptions) {
         }
     }
     return {
+        spawn: route("spawn"),
+        connect: route("connect"),
         readfile: route("readfile"),
         mkfile: route("mkfile"),
         rmfile: route("rmfile"),
