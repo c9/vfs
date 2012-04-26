@@ -30,8 +30,8 @@ function calcEtag(stat) {
 }
 
 // Implement bash string escaping.
-var safePattern = /^[a-z0-9_\/\-]*$/i; // These Don't need quoting
-var safeishPattern = /^[a-z0-9_\/\- *']*$/i; // These are fine with double quotes
+var safePattern =    /^[a-z0-9_\/\-.,?:@#%^+=\[\]]*$/i; // These Don't need quoting
+var safeishPattern = /^[a-z0-9_\/\-.,?:@#%^+=\[\]{}|&()<>; *']*$/i; // These are fine with double quotes
 function bashEscape(arg) {
     if (safePattern.test(arg)) return arg;
     if (safeishPattern.test(arg)) return '"' + arg + '"';
@@ -59,28 +59,26 @@ module.exports = function setup(fsOptions) {
   var checkPermissions, fsUid, fsGid;
   var username, groupname;
   if (fsOptions.hasOwnProperty("uid") || fsOptions.hasOwnProperty("gid")) {
-    // The process is running as root, but wants to simulate another user.
-    if (process.getuid() > 0) {
-      throw new Error("uid and/or gid specified, but not running as root");
-    }
-    checkPermissions = true; // Tell the system to not assume anything.
-    fsUid = fsOptions.uid || process.getuid();
-    fsGid = fsOptions.gid || process.getgid();
+    if (typeof fsOptions.uid === "number" || typeof fsOptions.uid === "number") {
 
-    // TODO: Remove this hack when node is fixed! Node's spawn is broken and
-    // doesn't accept uid/gid so we need to get the username and groupname to
-    // shell out to `su` and `sg` when spawning a process!
-    if (fsOptions.uid) {
-      childProcess.exec("getent passwd " + fsUid, function (err, stdout, stderr) {
-        username = stdout.substr(0, stdout.indexOf(":"));
-      });
-    }
-    if (fsOptions.gid) {
-      childProcess.exec("getent group " + fsGid, function (err, stdout, stderr) {
-        groupname = stdout.substr(0, stdout.indexOf(":"));
-      });
-    }
+      checkPermissions = true; // Tell the system to not assume anything.
+      fsUid = fsOptions.uid || process.getuid();
+      fsGid = fsOptions.gid || process.getgid();
 
+      // TODO: Remove this hack when node is fixed! Node's spawn is broken and
+      // doesn't accept uid/gid so we need to get the username and groupname to
+      // shell out to `su` and `sg` when spawning a process!
+      if (fsOptions.hasOwnProperty('uid')) {
+        childProcess.exec("getent passwd " + fsUid, function (err, stdout, stderr) {
+          username = stdout.substr(0, stdout.indexOf(":"));
+        });
+      }
+      if (fsOptions.hasOwnProperty('gid')) {
+        childProcess.exec("getent group " + fsGid, function (err, stdout, stderr) {
+          groupname = stdout.substr(0, stdout.indexOf(":"));
+        });
+      }
+    }
   } else {
     if (process.getuid() === 0) throw new Error("Please specify uid or gid when running as root");
     // The process represents itself
@@ -225,17 +223,6 @@ module.exports = function setup(fsOptions) {
 
     // TODO: Remove when node is fixed
     // if node doesn't fix it's uid/gid options we'll need to escape all arguments and use "su -c" and "sg -c"
-    if (options.hasOwnProperty('gid')) {
-      if (!groupname) {
-        var err = new Error("ENOTREADY: groupname not known yet");
-        err.code = "ENOTREADY";
-        return callback(err);
-      }
-      args.unshift(executablePath);
-      executablePath = "/usr/bin/sg";
-      args = [groupname, "-c", args.map(bashEscape).join(" ")];
-    }
-
     if (options.hasOwnProperty('uid')) {
       if (!username) {
         var err = new Error("ENOTREADY: username not known yet");
@@ -247,7 +234,18 @@ module.exports = function setup(fsOptions) {
       args = ["-c", args.map(bashEscape).join(" "), username];
     }
 
-    console.log(executablePath, args.map(bashEscape).join(" "));
+    if (options.hasOwnProperty('gid')) {
+      if (!groupname) {
+        var err = new Error("ENOTREADY: groupname not known yet");
+        err.code = "ENOTREADY";
+        return callback(err);
+      }
+      args.unshift(executablePath);
+      executablePath = "/usr/bin/sg";
+      args = [groupname, "-c", args.map(bashEscape).join(" ")];
+    }
+
+    // console.log(executablePath, args.map(bashEscape).join(" "));
 
     var child = childProcess.spawn(executablePath, args, options);
     if (options.resumeStdin) child.stdin.resume();
