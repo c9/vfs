@@ -1,4 +1,5 @@
 var fs = require('fs');
+var net = require('net');
 var childProcess = require('child_process');
 var constants = require('constants');
 var join = require('path').join;
@@ -257,21 +258,35 @@ module.exports = function setup(fsOptions) {
     }
 
     function dospawn() {
-      console.log(executablePath, args.map(bashEscape).join(" "));
+      // console.log(executablePath, args.map(bashEscape).join(" "));
 
       var child = childProcess.spawn(executablePath, args, options);
       if (options.resumeStdin) child.stdin.resume();
       callback(null, {
-        child: child
+        process: child
       });
     }
   }
 
-  function connect(executablePath, options, callback) {
-    // TODO: Implement retry logic
-    // options.retry
-    // options.retryDelay
-    throw new Error("Not Implemented");
+  function connect(port, options, callback) {
+    if (typeof port !== "number") throw new Error("port must be a number");
+    var retries = options.hasOwnProperty('retries') ? options.retries : 5;
+    var retryDelay = options.hasOwnProperty('retryDelay') ? options.retryDelay : 50;
+    tryConnect();
+    function tryConnect() {
+      var socket = net.connect(port, function () {
+        callback(null, {stream:socket});
+      });
+      socket.once("error", function (err) {
+        if (err.code === "ECONNREFUSED" && retries) {
+          setTimeout(tryConnect, retryDelay);
+          retries--;
+          retryDelay *= 2;
+          return;
+        }
+        return callback(err);
+      });
+    }
   }
 
   // Like fs.createReadStream, except with added HTTP-like options.
