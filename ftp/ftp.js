@@ -17,11 +17,15 @@ module.exports = function setup(fsOptions) {
 	};
 
 	function spawn(executablePath, options, callback) {
-		callback(new Error("FTP Cannot spawn"));
+		var err = new Error("ENOTSUPPORTED: FTP cannot spawn.");
+		err.code = "ENOTSUPPORTED";
+		callback(err);
 	}
 
 	function connect(port, options, callback) {
-		callback(new Error("FTP Cannot connect"));
+		var err = new Error("ENOTSUPPORTED: FTP cannot connect.");
+		err.code = "ENOTSUPPORTED";
+		callback(err);
 	}
 
 	function readfile(path, options, callback) {
