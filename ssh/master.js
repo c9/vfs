@@ -56,14 +56,25 @@ module.exports = function setup(fsOptions) {
 
     var host = fsOptions.host; // Username can just go in host since it's passed to ssh as-is
     if (!host) throw new Error("host is a required option in vfs-ssh");
-    
+
+    if (fsOptions.pingInterval) setTimeout(doPing, fsOptions.pingInterval);
+    function doPing() {
+      remote.ping(function (err) {
+        if (err) console.error(err.stack);
+        setTimeout(doPing, fsOptions.pingInterval);
+      });
+    }
+
     // Send bootstrap on command line
     var args = [host];
     // A specific key may be passed in
     if (fsOptions.key) {
-      args.push("-i");
-      args.push(options.key);
+      args.push("-i", options.key);
     }
+    if (fsOptions.serverAliveInterval) {
+      args.push("-o", "ServerAliveInterval " + fsOptions.serverAliveInterval);
+    }
+
     args.push("-C", nodePath + ' -e "' + bootstrap + '"');
 
     // Share stderr with parent to enable debugging
@@ -74,6 +85,7 @@ module.exports = function setup(fsOptions) {
     var code = libCode + "\nrequire('vfs-ssh/slave')(" + JSON.stringify(fsOptions) + ");\n";
     child.stdin.write(code + "\0");
 
-    return consumer({input: child.stdout, output: child.stdin});
+    remote = consumer({input: child.stdout, output: child.stdin});
+    return remote;
 }
 
