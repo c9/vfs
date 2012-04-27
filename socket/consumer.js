@@ -109,7 +109,16 @@ module.exports = function setup(fsOptions) {
             callback(err);
         }
     }
+    function ping(callback) {
+        if (remote) {
+            return remote.ping(callback);
+        }
+        var err = new Error("VFS not Ready yet");
+        err.code = "ENOTREADY";
+        callback(err);
+    }
     return {
+        ping: ping,
         spawn: route("spawn"),
         connect: route("connect"),
         readfile: route("readfile"),

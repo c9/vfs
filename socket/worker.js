@@ -83,6 +83,11 @@ module.exports = function setup(fsOptions) {
         process.kill(code);
     }
 
+    // Can be used for keepalive checks.
+    function ping(callback) {
+        callback();
+    }
+
     function route(name) {
         var fn = vfs[name];
         return function wrapped(path, options, callback) {
@@ -118,6 +123,7 @@ module.exports = function setup(fsOptions) {
         write: write,
         end: end,
         kill: kill,
+        ping: ping,
         // Route other calls to the local vfs instance
         spawn: route("spawn"),
         connect: route("connect"),
