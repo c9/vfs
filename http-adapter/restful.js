@@ -1,4 +1,5 @@
 var urlParse = require('url').parse;
+var multipart = require('./multipart');
 
 module.exports = function setup(mount, vfs) {
 
@@ -18,8 +19,9 @@ module.exports = function setup(mount, vfs) {
     function abort(err, code) {
       console.error(err.stack || err);
       if (code) res.statusCode = code;
-      else if (err.code === "ENOENT") res.statusCode = 404;
+      else if (err.code === "EBADREQUEST") res.statusCode = 400;
       else if (err.code === "EACCESS") res.statusCode = 403;
+      else if (err.code === "ENOENT") res.statusCode = 404;
       else if (err.code === "ENOTREADY") res.statusCode = 503;
       else res.statusCode = 500;
       var message = (err.stack || err) + "\n";
@@ -94,14 +96,33 @@ module.exports = function setup(mount, vfs) {
           res.end();
         });
       } else {
-        // TODO: Does this pause/buffer *all* events or just some?
+
+        // Pause the stream and record any events
+        var events = [];
+        function onData(chunk) {
+          events.push(["data", chunk]);
+        }
+        function onEnd() {
+          events.push(["end"]);
+        }
         req.pause();
+        req.on("data", onData);
+        req.on("end", onEnd);
+
         vfs.mkfile(path, {}, function (err, meta) {
           if (err) return abort(err);
           if (meta.stream) {
             meta.stream.on("error", abort);
             req.pipe(meta.stream);
+
+            // Resume the stream and emit any missing events
+            req.removeListener("data", onData);
+            req.removeListener("end", onEnd);
+            for (var i = 0, l = events.length; i < l; i++) {
+              req.emit.apply(req, events[i]);
+            }
             req.resume();
+
             meta.stream.on("saved", function () {
               res.end();
             });
@@ -126,6 +147,51 @@ module.exports = function setup(mount, vfs) {
     } // end DELETE request
 
     else if (req.method === "POST") {
+
+      if (path[path.length - 1] === "/") {
+        var contentType = req.headers["content-type"];
+        if (!contentType) {
+          return abort(new Error("Missing Content-Type header"), 400);
+        }
+        if (!(/multipart/i).test(contentType)) {
+          return abort(new Error("Content-Type should be multipart"), 400);
+        }
+        var match = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+        if (!match) {
+          return abort(new Error("Missing multipart boundary"), 400);
+        }
+        var boundary = match[1] || match[2];
+
+        var parser = multipart(req, boundary);
+
+        parser.on("part", function (stream) {
+          var contentDisposition = stream.headers["content-disposition"];
+          if (!contentDisposition) {
+            return parser.error("Missing Content-Disposition header in part");
+          }
+          var match = contentDisposition.match(/filename="([^"]*)"/);
+          if (!match) {
+            return parser.error("Missing filename in Content-Disposition header in part");
+          }
+          var filename = match[1];
+
+          stream.buffer();
+          vfs.mkfile(path + "/" + filename, {}, function (err, meta) {
+            if (err) return abort(err);
+            if (meta.stream) {
+              meta.stream.on("error", abort);
+              stream.pipe(meta.stream);
+              stream.flush();
+            }
+          });
+        });
+        parser.on("error", abort);
+        parser.on("end", function () {
+          res.end();
+        });
+        return;
+      }
+
       var data = "";
       req.on("data", function (chunk) {
         data += chunk;
