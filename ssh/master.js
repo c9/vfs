@@ -6,7 +6,7 @@ var consumer = require('vfs-socket/consumer');
 var bootstrap = ("(" + function () {
   // We don't want to send text on stdout
   console.log = console.error;
-  var code = '';
+  var code = "";
   function onChunk(chunk) {
     var end = -1;
     // Scan for null byte
@@ -21,32 +21,32 @@ var bootstrap = ("(" + function () {
       return;
     }
     if (end > 0) {
-      code += chunk.toString('utf8', 0, end);
+      code += chunk.toString("utf8", 0, end);
     }
     var left = chunk.slice(end + 1);
 
     // Stop reading code and execute the code
-    process.stdin.removeListener('data', onChunk);
+    process.stdin.removeListener("data", onChunk);
     // process.title = "node generated.js";
 
     try {
-        require('vm').runInNewContext(code, {
+        require("vm").runInNewContext(code, {
           require: require,
           Buffer: Buffer,
           process: process,
           console: console
-        }, 'generated.js');
+        }, "generated.js");
     } catch (err) {
         console.error(err.stack);
     }
-    if (left.length) process.stdin.emit('data', left);
+    if (left.length) process.stdin.emit("data", left);
   }
 
   // Start reading the code
-  process.stdin.on('data', onChunk);
+  process.stdin.on("data", onChunk);
   process.stdin.resume();
 
-} + ")();").replace(new RegExp("//.*\n", "g"), "").replace(/"/g, '\\"').replace(/[\n ]+/ig, " ");
+} + ")();").replace(new RegExp("//.*\n", "g"), "").replace(/[\n ]+/ig, "\n");
 
 var libCode = embedderSync(__dirname, ["vfs-socket", "vfs-socket/worker", "./slave"], true);
 
@@ -75,7 +75,7 @@ module.exports = function setup(fsOptions) {
       args.push("-o", "ServerAliveInterval " + fsOptions.serverAliveInterval);
     }
 
-    args.push("-C", nodePath + ' -e "' + bootstrap + '"');
+    args.push("-C", nodePath + " -e '" + bootstrap + "'");
 
     // Share stderr with parent to enable debugging
     var options = { customFds: [-1, -1, 2] };
