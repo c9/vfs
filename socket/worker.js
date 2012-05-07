@@ -140,6 +140,7 @@ module.exports = function setup(fsOptions) {
         mkfile: route("mkfile"),
         rmfile: route("rmfile"),
         readdir: route("readdir"),
+        stat: route("stat"),
         mkdir: route("mkdir"),
         rmdir: route("rmdir"),
         rename: route("rename"),
