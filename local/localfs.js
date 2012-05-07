@@ -392,8 +392,10 @@ module.exports = function setup(fsOptions) {
 
         var filepath = path.substr(base.length);
         createStatEntry(path, filepath, function(stat) {
-          meta.stat = stat;
-          callback(meta);
+          for (var key in stat)
+            meta[key] = stat[key];
+
+          callback(null, meta);
         });
       });
     });
