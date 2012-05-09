@@ -86,7 +86,7 @@ module.exports = function setup(fsOptions, callback) {
     // Load the worker vfs using the socket.
     agent.attach(socketTransport(input, output), function (worker) {
         remote = worker;
-        if (callback) callback(null, remote);
+        if (callback) callback(null, vfs);
     });
 
     // Return fake endpoints in the initial return till we have the real ones.
@@ -117,7 +117,8 @@ module.exports = function setup(fsOptions, callback) {
         err.code = "ENOTREADY";
         callback(err);
     }
-    return {
+
+    var vfs = {
         ping: ping,
         spawn: route("spawn"),
         connect: route("connect"),
@@ -131,4 +132,5 @@ module.exports = function setup(fsOptions, callback) {
         copy: route("copy"),
         symlink: route("symlink")
     };
+    return vfs;
 };
