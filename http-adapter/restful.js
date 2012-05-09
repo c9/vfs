@@ -126,6 +126,12 @@ module.exports = function setup(mount, vfs) {
           } else {
             meta.stream.pipe(res);
           }
+          req.on("close", function () {
+            if (meta.stream.readable) {
+              meta.stream.destroy();
+              meta.stream.readable = false;
+            }
+          })
         } else {
           res.end();
         }
