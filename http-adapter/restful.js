@@ -120,6 +120,7 @@ module.exports = function setup(mount, vfs) {
         if (meta.hasOwnProperty('stream')) {
           meta.stream.on("error", abort);
           if (options.encoding === null) {
+            res.setHeader("Content-Type", "application/json");
             var base = (req.socket.encrypted ? "https://" : "http://") + req.headers.host + pathJoin(mount, path);
             jsonEncoder(meta.stream, base).pipe(res);
           } else {

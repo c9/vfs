@@ -326,7 +326,7 @@ module.exports = function setup(fsOptions) {
 
         fs.readdir(path, function (err, files) {
           if (err) return callback(err);
-          meta.mime = "application/json";
+          if (encoding === "json") meta.mime = "application/json";
           if (options.head) {
             return callback(null, meta);
           }
