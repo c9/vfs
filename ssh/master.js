@@ -51,7 +51,7 @@ var bootstrap = ("(" + function () {
 var libCode = embedderSync(__dirname, ["vfs-socket", "vfs-socket/worker", "./slave"], true);
 
 // Simple vfs that uses vfs-socket over a ssh tunnel to a remote node process
-module.exports = function setup(fsOptions) {
+module.exports = function setup(fsOptions, callback) {
     var nodePath = fsOptions.nodePath || "/usr/local/bin/node";
 
     var host = fsOptions.host; // Username can just go in host since it's passed to ssh as-is
@@ -86,15 +86,60 @@ module.exports = function setup(fsOptions) {
 
     args.push(nodePath + " -e '" + bootstrap + "'");
 
-    // Share stderr with parent to enable debugging
-    var options = { customFds: [-1, -1, 2] };
-
-    var child = spawn("ssh", args, options);
+    var child = spawn("ssh", args);
+    // Forward stderr data for easy debugging
+    child.stderr.pipe(process.stderr, {end: false});
 
     var code = libCode + "\nrequire('vfs-ssh/slave')(" + JSON.stringify(fsOptions) + ");\n";
     child.stdin.write(code + "\0");
 
-    remote = consumer({input: child.stdout, output: child.stdin});
+    var stdoutChunks = [];
+    var stderrChunks = [];
+    function captureStdout(chunk) {
+      stdoutChunks.push(chunk);
+    }
+    function captureStderr(chunk) {
+      stderrChunks.push(chunk);
+    }
+
+    child.stdout.on("data", captureStdout);
+    child.stderr.on("data", captureStderr);
+
+    var done;
+    child.on("exit", function (code, signal) {
+      if (done) return;
+      var stdout = stdoutChunks.join("").trim();
+      var stderr = stderrChunks.join("").trim();
+      child.stdout.removeListener("data", captureStdout);
+      child.stderr.removeListener("data", captureStderr);
+      done = true;
+      var err = new Error("ssh process died");
+      if (signal) {
+        err.message += " because of signal " + signal;
+        err.signal = signal;
+      }
+      if (code) {
+        err.message += " with exit code " + code;
+        err.exitCode = code;
+      }
+      if (stdout) {
+        err.message += "\n" + stdout;
+        err.stdout = stdout;
+      }
+      if (stderr) {
+        err.message += "\n" + stderr;
+        err.stderr = stderr;
+      }
+      callback(err);
+    });
+
+    remote = consumer({input: child.stdout, output: child.stdin}, function (err, remote) {
+      if (done) return;
+      child.stdout.removeListener("data", captureStdout);
+      done = true;
+      if (err) return callback(err);
+      if (callback) callback(null, remote);
+    });
     return remote;
 }
 
