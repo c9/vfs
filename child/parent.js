@@ -6,6 +6,14 @@ var Pipe;
 module.exports = function setup(fsOptions) {
     if (!Pipe) Pipe = process.binding('pipe_wrap').Pipe;
     var options = { customFds: [-1, 1, 2], stdinStream: new Pipe(true) };
+    if (fsOptions.hasOwnProperty("gid")) {
+        options.gid = fsOptions.gid;
+        delete fsOptions.gid;
+    }
+    if (fsOptions.hasOwnProperty("uid")) {
+        options.uid = fsOptions.uid;
+        delete fsOptions.uid;
+    }
     var args = [require.resolve('./child.js'), JSON.stringify(fsOptions)];
     var executablePath = process.execPath;
 
