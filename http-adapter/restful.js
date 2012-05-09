@@ -1,7 +1,45 @@
 var urlParse = require('url').parse;
 var multipart = require('./multipart');
+var Stream = require('stream').Stream;
+var pathJoin = require('path').join;
 
 module.exports = function setup(mount, vfs) {
+
+  // Returns a json stream that wraps input object stream
+  function jsonEncoder(input, path) {
+    var output = new Stream();
+    output.readable = true;
+    var first = true;
+    input.on("data", function (entry) {
+      if (path) {
+        entry.href = path + entry.name;
+        if (entry.mime === "inode/directory") {
+          entry.href += "/";
+        }
+      }
+      if (first) {
+        output.emit("data", "[\n  " + JSON.stringify(entry));
+        first = false;
+      } else {
+        output.emit("data", ",\n  " + JSON.stringify(entry));
+      }
+    });
+    input.on("end", function () {
+      output.emit("data", "\n]");
+      output.emit("end");
+    });
+    if (input.pause) {
+      output.pause = function () {
+        input.pause();
+      };
+    }
+    if (input.resume) {
+      output.resume = function () {
+        input.resume();
+      };
+    }
+    return output;
+  }
 
   return function (req, res, next) {
 
@@ -54,6 +92,7 @@ module.exports = function setup(mount, vfs) {
       }
 
       if (path[path.length - 1] === "/") {
+        options.encoding = null; // Use raw objects for data events
         vfs.readdir(path, options, onGet);
       } else {
         vfs.readfile(path, options, onGet);
@@ -80,7 +119,12 @@ module.exports = function setup(mount, vfs) {
         }
         if (meta.hasOwnProperty('stream')) {
           meta.stream.on("error", abort);
-          meta.stream.pipe(res);
+          if (options.encoding === null) {
+            var base = (req.socket.encrypted ? "https://" : "http://") + req.headers.host + pathJoin(mount, path);
+            jsonEncoder(meta.stream, base).pipe(res);
+          } else {
+            meta.stream.pipe(res);
+          }
         } else {
           res.end();
         }
