@@ -39,6 +39,11 @@ module.exports = function setup(fsOptions, callback) {
                 delete proxyStreams[id];
             };
         }
+        if (stream.readable) {
+            stream.destroy = function () {
+                remote.destroy(id);
+            };
+        }
 
         return stream;
     }

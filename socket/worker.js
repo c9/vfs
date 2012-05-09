@@ -71,8 +71,16 @@ module.exports = function setup(fsOptions) {
         var stream = streams[id];
         stream.write(chunk);
     }
+    function destroy(id) {
+        var stream = streams[id];
+        if (!stream) return;
+        stream.destroy();
+        delete streams[id];
+        nextID = id;
+    }
     function end(id, chunk) {
         var stream = streams[id];
+        if (!stream) return;
         stream.end(chunk);
         delete streams[id];
         nextID = id;
@@ -122,6 +130,7 @@ module.exports = function setup(fsOptions) {
         // And stream endpoints for writable streams to receive their data
         write: write,
         end: end,
+        destroy: destroy,
         kill: kill,
         ping: ping,
         // Route other calls to the local vfs instance
