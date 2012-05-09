@@ -7,7 +7,7 @@ var EventEmitter = require('events').EventEmitter;
 //   fsOptions.input - input stream
 //   fsOptions.output - output stream (reuses input if not given)
 //   fsOptions.callback - get's called with the remote once connected
-module.exports = function setup(fsOptions) {
+module.exports = function setup(fsOptions, callback) {
     var input = fsOptions.input;
     if (!(input instanceof Stream && input.readable !== false)) throw new TypeError("input must be a readable Stream");
     var output = fsOptions.hasOwnProperty("output") ? fsOptions.output : input;
@@ -86,7 +86,7 @@ module.exports = function setup(fsOptions) {
     // Load the worker vfs using the socket.
     agent.attach(socketTransport(input, output), function (worker) {
         remote = worker;
-        if (fsOptions.callback) fsOptions.callback(worker);
+        if (callback) callback(null, remote);
     });
 
     // Return fake endpoints in the initial return till we have the real ones.
