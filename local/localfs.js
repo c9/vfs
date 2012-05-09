@@ -36,7 +36,6 @@ function calcEtag(stat) {
 //   fsOptions.umask - default umask for creating files
 //   fsOptions.root - root path to mount, this needs to be realpath'ed or it won't work.
 //   fsOptions.skipSearchCheck - Skip the folder execute/search permission check on file open.
-//   fsOptions.httpRoot - used for generating links in directory listing.  It's where this fs is mounted over http.
 module.exports = function setup(fsOptions) {
   var root = fsOptions.root;
   if (!root) throw new Error("root is a required option");
@@ -303,6 +302,11 @@ module.exports = function setup(fsOptions) {
   // The order of the files in undefined.  The client should sort afterwards.
   function readdir(path, options, callback) {
     var meta = {};
+    var encoding = "json";
+    if (options.hasOwnProperty("encoding")) encoding = options.encoding;
+    if (!(!encoding || encoding === "json")) {
+      return callback(new Error("encoding must be null or 'json'"));
+    }
 
     realpath(path, function (err, path) {
       if (err) return callback(err);
@@ -340,7 +344,7 @@ module.exports = function setup(fsOptions) {
           };
           meta.stream = stream;
           callback(null, meta);
-          stream.emit("data", "[");
+          if (encoding === "json") stream.emit("data", "[");
           var index = 0;
           stream.resume();
           function getNext() {
@@ -362,21 +366,14 @@ module.exports = function setup(fsOptions) {
                 entry.access = stat.access;
                 entry.size = stat.size;
 
-                if (stat.isDirectory()) {
-                  entry.mime = "inode/directory";
-                  if (fsOptions.httpRoot) {
-                    entry.href = fsOptions.httpRoot + filepath.substr(1) + "/";
-                  }
-                } else if (stat.isBlockDevice()) entry.mime = "inode/blockdevice";
+                if (stat.isDirectory()) entry.mime = "inode/directory";
+                else if (stat.isBlockDevice()) entry.mime = "inode/blockdevice";
                 else if (stat.isCharacterDevice()) entry.mime = "inode/chardevice";
                 else if (stat.isSymbolicLink()) entry.mime = "inode/symlink";
                 else if (stat.isFIFO()) entry.mime = "inode/fifo";
                 else if (stat.isSocket()) entry.mime = "inode/socket";
                 else {
                   entry.mime = getMime(filepath);
-                  if (fsOptions.httpRoot) {
-                    entry.href = fsOptions.httpRoot + filepath.substr(1);
-                  }
                 }
 
                 if (!stat.isSymbolicLink()) {
@@ -392,7 +389,8 @@ module.exports = function setup(fsOptions) {
                 });
               }
               function send() {
-                var ret = stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
+                if (encoding === "json") stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
+                else stream.emit("data", entry);
                 if (!paused) {
                   getNext();
                 }
@@ -400,7 +398,7 @@ module.exports = function setup(fsOptions) {
             });
           }
           function done() {
-            stream.emit("data", "\n]\n");
+            if (encoding === "json") stream.emit("data", "\n]\n");
             stream.emit("end");
           }
         });
