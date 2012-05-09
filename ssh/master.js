@@ -17,7 +17,7 @@ var bootstrap = ("(" + function () {
       }
     }
     if (end < 0) {
-      code += chunk.toString('utf8');
+      code += chunk.toString("utf8");
       return;
     }
     if (end > 0) {
@@ -67,15 +67,24 @@ module.exports = function setup(fsOptions) {
 
     // Send bootstrap on command line
     var args = [host];
-    // A specific key may be passed in
-    if (fsOptions.key) {
-      args.push("-i", options.key);
-    }
-    if (fsOptions.serverAliveInterval) {
-      args.push("-o", "ServerAliveInterval " + fsOptions.serverAliveInterval);
+
+    var sshOptions = {
+      BatchMode: "yes",
     }
 
-    args.push("-C", nodePath + " -e '" + bootstrap + "'");
+    // see `man ssh_config` to see what options are avaialble
+    // Mix in user specified options overrides
+    if (fsOptions.sshOptions) {
+      for (var key in fsOptions.sshOptions) {
+        sshOptions[key] = fsOptions.sshOptions[key];
+      }
+    }
+
+    for (key in sshOptions) {
+      args.push("-o", key + "=" + sshOptions[key]);
+    }
+
+    args.push(nodePath + " -e '" + bootstrap + "'");
 
     // Share stderr with parent to enable debugging
     var options = { customFds: [-1, -1, 2] };
