@@ -382,7 +382,7 @@ module.exports = function setup(fsOptions) {
         if (err) return callback(err);
 
         var filepath = path.substr(base.length);
-        createStatEntry(path, filepath, callback);
+        createStatEntry(path, filepath, callback.bind(this, null));
       });
     });
   }
