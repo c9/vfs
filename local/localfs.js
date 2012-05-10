@@ -202,6 +202,11 @@ module.exports = function setup(fsOptions) {
     if (options.hasOwnProperty('stderrEncoding')) {
       child.stderr.setEncoding(options.stderrEncoding);
     }
+
+    child.kill = function(signal) {
+      killtree(child, signal);
+    }
+
     callback(null, {
       process: child
     });
@@ -245,6 +250,49 @@ module.exports = function setup(fsOptions) {
 
         callback(err, stdout, stderr);
       });
+    });
+  }
+
+  function killtree(child, signal){
+    signal = signal || "SIGTERM";
+    var pid = child.pid;
+
+    childrenOfPid(pid, function(err, pidlist){
+      if (err) {
+        console.error(err);
+        return;
+      }
+
+      pidlist.forEach(function (cpid) {
+        try {
+          process.kill(cpid, signal);
+        } catch(e) {
+          // kill may throw if the pid does not exist.
+        }
+      });
+    });
+  }
+
+  function childrenOfPid(pid, callback) {
+    exec("ps", {args: ["-A", "-oppid,pid"]}, function(err, stdout, stderr) {
+      if (err)
+        return callback(err);
+
+      var parents = {};
+      stdout.split("\n").slice(1).forEach(function(line) {
+        var col = line.trim().split(/\s+/g);
+        (parents[col[0]] || (parents[col[0]] = [])).push(col[1]);
+      });
+
+      function search(roots) {
+        var res = roots.concat();
+        for (var c, i = 0; i < roots.length; i++) {
+          if ((c = parents[roots[i]]) && c.length)
+            res.push.apply(res, search(c));
+        }
+        return res;
+      }
+      callback(null, search([pid]));
     });
   }
 
