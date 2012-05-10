@@ -378,12 +378,9 @@ module.exports = function setup(fsOptions) {
   function stat(path, options, callback) {
     realpath(path, function (err, path) {
       if (err) return callback(err);
-      statSafe(path, 4, function (err, stat) {
-        if (err) return callback(err);
 
-        var filepath = path.substr(base.length);
-        createStatEntry(path, filepath, callback.bind(this, null));
-      });
+      var filepath = path.substr(base.length);
+      createStatEntry(path, filepath, callback.bind(this, null));
     });
   }
 
