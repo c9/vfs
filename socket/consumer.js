@@ -126,6 +126,7 @@ module.exports = function setup(fsOptions, callback) {
     var vfs = {
         ping: ping,
         spawn: route("spawn"),
+        exec: route("exec"),
         connect: route("connect"),
         readfile: route("readfile"),
         mkfile: route("mkfile"),

@@ -61,6 +61,7 @@ module.exports = function setup(fsOptions) {
   return {
     // Process Management
     spawn: spawn,
+    exec: exec,
 
     // Network tunnel
     connect: connect,

@@ -135,6 +135,7 @@ module.exports = function setup(fsOptions) {
         ping: ping,
         // Route other calls to the local vfs instance
         spawn: route("spawn"),
+        exec: route("exec"),
         connect: route("connect"),
         readfile: route("readfile"),
         mkfile: route("mkfile"),
