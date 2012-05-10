@@ -207,6 +207,47 @@ module.exports = function setup(fsOptions) {
     });
   }
 
+  function exec(executablePath, options, callback) {
+    spawn(executablePath, options, function(err, meta) {
+      if (err) return callback(err);
+
+      var stdout = [];
+      var stderr = [];
+
+      meta.process.stdout.on("data", function(data) { stdout.push(data); });
+      meta.process.stderr.on("data", function(data) { stderr.push(data); });
+
+      meta.process.on("exit", function(code, signal) {
+        var err = null;
+        stdout = stdout.join("").trim();
+        stderr = stderr.join("").trim();
+
+        if (code || signal) {
+          err = new Error("rm process died");
+          if (signal) {
+            err.message += " because of signal " + signal;
+            err.signal = signal;
+          }
+          if (code) {
+            err.message += " with exit code " + code;
+            err.exitCode = code;
+          }
+          if (stdout) {
+            err.message += "\n" + stdout;
+            err.stdout = stdout;
+          }
+          if (stderr) {
+            err.message += "\n" + stderr;
+            err.stderr = stderr;
+          }
+          return callback(err);
+        }
+
+        callback(err, stdout, stderr);
+      });
+    });
+  }
+
   function connect(port, options, callback) {
     if (typeof port !== "number") throw new Error("port must be a number");
     var retries = options.hasOwnProperty('retries') ? options.retries : 5;
@@ -520,8 +561,14 @@ module.exports = function setup(fsOptions) {
   }
 
   function rmdir(path, options, callback) {
-    // TODO: add recursive delete to options?
-    remove(path, fs.rmdir, callback);
+    if (options.recursive) {
+      remove(path, function(path, callback) {
+        exec("rm", {args: ["-rf", path]}, callback);
+      }, callback);
+    }
+    else {
+      remove(path, fs.rmdir, callback);
+    }
   }
 
   function rmfile(path, options, callback) {

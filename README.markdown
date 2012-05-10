@@ -137,7 +137,9 @@ There are no `options` for this function.
 
 Remove a directory
 
-There are no `options` for this function.
+`options` can include:
+
+ - options.recursive - (optional, default is `false`) whether to delete everything within this directory.
 
 `meta` in the response is empty.
 
