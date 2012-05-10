@@ -352,10 +352,8 @@ module.exports = function setup(fsOptions) {
             var file = files[index++];
             var left = files.length - index;
             var fullpath = join(path, file);
-            var filepath = fullpath.substr(base.length);
-            if (filepath[0] !== "/") filepath = "/" + filepath;
 
-            createStatEntry(fullpath, filepath, function(entry) {
+            createStatEntry(fullpath, function(entry) {
               if (encoding === "json")
                 stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
               else
@@ -379,12 +377,11 @@ module.exports = function setup(fsOptions) {
     realpath(path, function (err, path) {
       if (err) return callback(err);
 
-      var filepath = path.substr(base.length);
-      createStatEntry(path, filepath, callback.bind(this, null));
+      createStatEntry(path, callback.bind(this, null));
     });
   }
 
-  function createStatEntry(fullpath, filepath, callback) {
+  function createStatEntry(fullpath, callback) {
     var file = basename(fullpath);
     lstatSafe(fullpath, 0, function (err, stat) {
       var entry = {
@@ -400,19 +397,13 @@ module.exports = function setup(fsOptions) {
 
         if (stat.isDirectory()) {
           entry.mime = "inode/directory";
-          if (fsOptions.httpRoot) {
-            entry.href = fsOptions.httpRoot + filepath.substr(1) + "/";
-          }
         } else if (stat.isBlockDevice()) entry.mime = "inode/blockdevice";
         else if (stat.isCharacterDevice()) entry.mime = "inode/chardevice";
         else if (stat.isSymbolicLink()) entry.mime = "inode/symlink";
         else if (stat.isFIFO()) entry.mime = "inode/fifo";
         else if (stat.isSocket()) entry.mime = "inode/socket";
         else {
-          entry.mime = getMime(filepath);
-          if (fsOptions.httpRoot) {
-            entry.href = fsOptions.httpRoot + filepath.substr(1);
-          }
+          entry.mime = getMime(fullpath);
         }
 
         if (!stat.isSymbolicLink()) {
@@ -425,8 +416,8 @@ module.exports = function setup(fsOptions) {
             entry.link = link;
           }
           callback(entry);
-        })
-      };
+        });
+      }
     });
   }
 
