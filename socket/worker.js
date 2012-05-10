@@ -42,6 +42,13 @@ module.exports = function setup(fsOptions) {
                 nextID = id;
             });
         }
+        if (stream.writable) {
+            stream.on("close", function () {
+                remote.onClose(id);
+                delete streams[id];
+                nextID = id;
+            });
+        }
         var token = {id: id};
         if (stream.hasOwnProperty("readable")) token.readable = stream.readable;
         if (stream.hasOwnProperty("writable")) token.writable = stream.writable;

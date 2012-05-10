@@ -36,7 +36,6 @@ module.exports = function setup(fsOptions, callback) {
             stream.end = function (chunk) {
                 if (chunk) remote.end(id, chunk)
                 else remote.end(id);
-                delete proxyStreams[id];
             };
         }
         if (stream.readable) {
@@ -81,11 +80,17 @@ module.exports = function setup(fsOptions, callback) {
         stream.emit("end");
         delete proxyStreams[id];
     }
+    function onClose(id) {
+        var stream = proxyStreams[id];
+        stream.emit("close");
+        delete proxyStreams[id];
+    }
 
     var agent = new Agent({
         onExit: onExit,
         onData: onData,
         onEnd: onEnd,
+        onClose: onClose
     });
 
     // Load the worker vfs using the socket.
