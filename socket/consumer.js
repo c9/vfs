@@ -82,6 +82,7 @@ module.exports = function setup(fsOptions, callback) {
     }
     function onClose(id) {
         var stream = proxyStreams[id];
+        if (!stream) return;
         stream.emit("close");
         delete proxyStreams[id];
     }

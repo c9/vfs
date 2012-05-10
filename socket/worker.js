@@ -88,7 +88,10 @@ module.exports = function setup(fsOptions) {
     function end(id, chunk) {
         var stream = streams[id];
         if (!stream) return;
-        stream.end(chunk);
+        if (chunk)
+            stream.end(chunk);
+        else
+            stream.end();
         delete streams[id];
         nextID = id;
     }
