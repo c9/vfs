@@ -498,11 +498,12 @@ module.exports = function setup(fsOptions) {
   function rmdir(path, options, callback) {
     if (options.recursive) {
       remove(path, function(path, callback) {
-        spawn("rm", ["-rf", path], function(err, child) {
+        spawn("rm", {args: ["-rf", path]}, function(err, meta) {
           if (err) return callback(err);
 
+          var child = meta.process;
           var err = "";
-          child.on("stderr", function(data) {
+          child.stderr.on("data", function(data) {
             err += data;
           });
           child.on("exit", function(code) {
