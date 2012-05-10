@@ -515,7 +515,20 @@ module.exports = function setup(fsOptions) {
       remove(path, function(path, callback) {
         exec("rm", {args: ["-rf", path]}, function(code, stdout, stderr) {
           if (code) {
-            return callback("error removing directory: " + code + " " + stderr);
+            var err = new Error("rm process died");
+            if (code) {
+              err.message += " with exit code " + code;
+              err.exitCode = code;
+            }
+            if (stdout) {
+              err.message += "\n" + stdout;
+              err.stdout = stdout;
+            }
+            if (stderr) {
+              err.message += "\n" + stderr;
+              err.stderr = stderr;
+            }
+            return callback(err);
           }
           callback();
         });
