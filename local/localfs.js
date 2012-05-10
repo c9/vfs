@@ -207,8 +207,8 @@ module.exports = function setup(fsOptions) {
       var stdout = [];
       var stderr = [];
 
-      meta.process.stdout.on("data", stdout.push.bind(stdout, stdout));
-      meta.process.stderr.on("data", stderr.push.bind(stderr, stderr));
+      meta.process.stdout.on("data", function(data) { stdout.push(data); });
+      meta.process.stderr.on("data", function(data) { stderr.push(data); });
 
       meta.process.on("exit", function(code) {
         callback(code, stdout.join(""), stderr.join(""));
