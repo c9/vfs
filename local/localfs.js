@@ -353,7 +353,7 @@ module.exports = function setup(fsOptions) {
             var left = files.length - index;
             var fullpath = join(path, file);
 
-            createStatEntry(fullpath, function(entry) {
+            createStatEntry(file, fullpath, function(entry) {
               if (encoding === "json")
                 stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
               else
@@ -377,12 +377,12 @@ module.exports = function setup(fsOptions) {
     realpath(path, function (err, path) {
       if (err) return callback(err);
 
-      createStatEntry(path, callback.bind(this, null));
+      var file = basename(path);
+      createStatEntry(file, path, callback.bind(this, null));
     });
   }
 
-  function createStatEntry(fullpath, callback) {
-    var file = basename(fullpath);
+  function createStatEntry(file, fullpath, callback) {
     lstatSafe(fullpath, 0, function (err, stat) {
       var entry = {
         name: file
