@@ -70,6 +70,7 @@ module.exports = function setup(fsOptions) {
     mkfile: mkfile,
     rmfile: rmfile,
     readdir: readdir,
+    stat: stat,
     mkdir: mkdir,
     rmdir: rmdir,
     rename: rename,
@@ -323,7 +324,6 @@ module.exports = function setup(fsOptions) {
           return callback(null, meta);
         }
 
-
         fs.readdir(path, function (err, files) {
           if (err) return callback(err);
           if (encoding === "json") meta.mime = "application/json";
@@ -352,48 +352,15 @@ module.exports = function setup(fsOptions) {
             var file = files[index++];
             var left = files.length - index;
             var fullpath = join(path, file);
-            filepath = fullpath.substr(base.length);
-            if (filepath[0] !== "/") filepath = "/" + filepath;
-            lstatSafe(fullpath, 0, function (err, stat) {
-              var entry = {
-                name: file
-              };
 
-              if (err) {
-                entry.err = err.stack || err;
-                return send();
-              } else {
-                entry.access = stat.access;
-                entry.size = stat.size;
+            createStatEntry(file, fullpath, function(entry) {
+              if (encoding === "json")
+                stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
+              else
+                stream.emit("data", entry);
 
-                if (stat.isDirectory()) entry.mime = "inode/directory";
-                else if (stat.isBlockDevice()) entry.mime = "inode/blockdevice";
-                else if (stat.isCharacterDevice()) entry.mime = "inode/chardevice";
-                else if (stat.isSymbolicLink()) entry.mime = "inode/symlink";
-                else if (stat.isFIFO()) entry.mime = "inode/fifo";
-                else if (stat.isSocket()) entry.mime = "inode/socket";
-                else {
-                  entry.mime = getMime(filepath);
-                }
-
-                if (!stat.isSymbolicLink()) {
-                  return send();
-                }
-                fs.readlink(fullpath, function (err, link) {
-                  if (err) {
-                    entry.linkErr = err.stack;
-                  } else {
-                    entry.link = link;
-                  }
-                  send();
-                });
-              }
-              function send() {
-                if (encoding === "json") stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
-                else stream.emit("data", entry);
-                if (!paused) {
-                  getNext();
-                }
+              if (!paused) {
+                getNext();
               }
             });
           }
@@ -403,6 +370,54 @@ module.exports = function setup(fsOptions) {
           }
         });
       });
+    });
+  }
+
+  function stat(path, options, callback) {
+    realpath(path, function (err, path) {
+      if (err) return callback(err);
+
+      var file = basename(path);
+      createStatEntry(file, path, callback.bind(this, null));
+    });
+  }
+
+  function createStatEntry(file, fullpath, callback) {
+    lstatSafe(fullpath, 0, function (err, stat) {
+      var entry = {
+        name: file
+      };
+
+      if (err) {
+        entry.err = err.stack || err;
+        return callback(entry);
+      } else {
+        entry.access = stat.access;
+        entry.size = stat.size;
+
+        if (stat.isDirectory()) {
+          entry.mime = "inode/directory";
+        } else if (stat.isBlockDevice()) entry.mime = "inode/blockdevice";
+        else if (stat.isCharacterDevice()) entry.mime = "inode/chardevice";
+        else if (stat.isSymbolicLink()) entry.mime = "inode/symlink";
+        else if (stat.isFIFO()) entry.mime = "inode/fifo";
+        else if (stat.isSocket()) entry.mime = "inode/socket";
+        else {
+          entry.mime = getMime(fullpath);
+        }
+
+        if (!stat.isSymbolicLink()) {
+          return callback(entry);
+        }
+        fs.readlink(fullpath, function (err, link) {
+          if (err) {
+            entry.linkErr = err.stack;
+          } else {
+            entry.link = link;
+          }
+          callback(entry);
+        });
+      }
     });
   }
 

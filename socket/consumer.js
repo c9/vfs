@@ -81,7 +81,7 @@ module.exports = function setup(fsOptions, callback) {
         stream.emit("end");
         delete proxyStreams[id];
     }
-    
+
     var agent = new Agent({
         onExit: onExit,
         onData: onData,
@@ -131,6 +131,7 @@ module.exports = function setup(fsOptions, callback) {
         mkfile: route("mkfile"),
         rmfile: route("rmfile"),
         readdir: route("readdir"),
+        stat: route("stat"),
         mkdir: route("mkdir"),
         rmdir: route("rmdir"),
         rename: route("rename"),
