@@ -496,8 +496,24 @@ module.exports = function setup(fsOptions) {
   }
 
   function rmdir(path, options, callback) {
-    // TODO: add recursive delete to options?
-    remove(path, fs.rmdir, callback);
+    if (options.recursive) {
+      remove(path, function(path, callback) {
+        var rm = spawn("rm", ["-rf", path]);
+        var err = "";
+        rm.on("stderr", function(data) {
+          err += data;
+        });
+        rm.on("exit", function(code) {
+          if (code) {
+            return callback("error removing directory: " + code + " " + err.join(""));
+          }
+          callback();
+        });
+      }, callback);
+    }
+    else {
+      remove(path, fs.rmdir, callback);
+    }
   }
 
   function rmfile(path, options, callback) {
