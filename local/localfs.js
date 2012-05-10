@@ -215,7 +215,7 @@ module.exports = function setup(fsOptions) {
         stdout = stdout.join("").trim();
         stderr = stderr.join("").trim();
 
-        if (code) {
+        if (code || signal) {
           err = new Error("rm process died");
           if (signal) {
             err.message += " because of signal " + signal;
