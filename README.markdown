@@ -93,14 +93,8 @@ directory.  Entries contain:
 Returns the file system attributes of a directory or a file and returns it
 using the same format as the `readdir` command.
 
-`options` can include:
-
- - options.etag - the browser sent an If-None-Match header with etag
- - options.head - the request was a HEAD request
-
 `meta` in the response can include:
 
- - meta.notModified - truthy if the server should send 304 (etag matched)
  - meta.etag - The weak etag of the directory (embeds inode, size and mtime)
  - meta.mime - The mime of the directory "inode/directory"
  - name: the filename

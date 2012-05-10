@@ -360,7 +360,7 @@ module.exports = function setup(fsOptions) {
                 stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
               else
                 stream.emit("data", entry);
-                    
+
               if (!paused) {
                 getNext();
               }
@@ -376,27 +376,13 @@ module.exports = function setup(fsOptions) {
   }
 
   function stat(path, options, callback) {
-    var meta = {};
-
     realpath(path, function (err, path) {
       if (err) return callback(err);
       statSafe(path, 4, function (err, stat) {
         if (err) return callback(err);
 
-        // ETag support
-        meta.etag = calcEtag(stat);
-        if (options.etag === meta.etag) {
-          meta.notModified = true;
-          return callback(null, meta);
-        }
-
         var filepath = path.substr(base.length);
-        createStatEntry(path, filepath, function(stat) {
-          for (var key in stat)
-            meta[key] = stat[key];
-
-          callback(null, meta);
-        });
+        createStatEntry(path, filepath, callback);
       });
     });
   }
