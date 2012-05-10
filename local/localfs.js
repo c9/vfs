@@ -211,10 +211,32 @@ module.exports = function setup(fsOptions) {
       meta.process.stderr.on("data", function(data) { stderr.push(data); });
 
       meta.process.on("exit", function(code) {
-        callback(code, stdout.join(""), stderr.join(""));
+        var err = null;
+        stdout = stdout.join("").trim();
+        stderr = stderr.join("").trim();
+
+        if (code) {
+          err = new Error("rm process died");
+          if (code) {
+            err.message += " with exit code " + code;
+            err.exitCode = code;
+          }
+          if (stdout) {
+            err.message += "\n" + stdout;
+            err.stdout = stdout;
+          }
+          if (stderr) {
+            err.message += "\n" + stderr;
+            err.stderr = stderr;
+          }
+          return callback(err);
+        }
+
+        callback(err, stdout, stderr);
       });
     });
   }
+
   function connect(port, options, callback) {
     if (typeof port !== "number") throw new Error("port must be a number");
     var retries = options.hasOwnProperty('retries') ? options.retries : 5;
@@ -513,25 +535,7 @@ module.exports = function setup(fsOptions) {
   function rmdir(path, options, callback) {
     if (options.recursive) {
       remove(path, function(path, callback) {
-        exec("rm", {args: ["-rf", path]}, function(code, stdout, stderr) {
-          if (code) {
-            var err = new Error("rm process died");
-            if (code) {
-              err.message += " with exit code " + code;
-              err.exitCode = code;
-            }
-            if (stdout) {
-              err.message += "\n" + stdout;
-              err.stdout = stdout;
-            }
-            if (stderr) {
-              err.message += "\n" + stderr;
-              err.stderr = stderr;
-            }
-            return callback(err);
-          }
-          callback();
-        });
+        exec("rm", {args: ["-rf", path]}, callback);
       }, callback);
     }
     else {
