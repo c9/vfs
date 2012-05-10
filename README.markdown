@@ -88,6 +88,22 @@ directory.  Entries contain:
  - etag: The etag of this file or directory
  - link: (optional) The data contents of a symlink if the entry is a symlink.
 
+## vfs.stat(path, options, callback)
+
+Returns the file system attributes of a directory or a file and returns it
+using the same format as the `readdir` command.
+
+`meta` in the response can include:
+
+ - meta.etag - The weak etag of the directory (embeds inode, size and mtime)
+ - meta.mime - The mime of the directory "inode/directory"
+ - name: the filename
+ - path: the path relative to the vfs root
+ - href: a full href to the resource (useful for the jsonview plugin to enable hyperlinking)
+ - access: An integer bitfield showing the access permissions of the vfs. (4 - read, 2 - write, 1 - execute/search)
+ - size: The size of the file as reported by stat
+ - link: (optional) The data contents of a symlink if the entry is a symlink.
+
 ## vfs.mkfile(path, options, callback)
 
 Saves a file stream to the vfs.  Always first creates a tmp file and then renames
