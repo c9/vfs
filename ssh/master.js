@@ -110,8 +110,8 @@ module.exports = function setup(fsOptions, callback) {
       if (done) return;
       var stdout = stdoutChunks.join("").trim();
       var stderr = stderrChunks.join("").trim();
-      child.stdout.removeListener("data", captureStdout);
-      child.stderr.removeListener("data", captureStderr);
+      child.stdout && child.stdout.removeListener("data", captureStdout);
+      child.stderr && child.stderr.removeListener("data", captureStderr);
       done = true;
       var err = new Error("ssh process died");
       if (signal) {
@@ -133,7 +133,7 @@ module.exports = function setup(fsOptions, callback) {
       callback(err);
     });
 
-    remote = consumer({input: child.stdout, output: child.stdin}, function (err, remote) {
+    var remote = consumer({input: child.stdout, output: child.stdin}, function (err, remote) {
       if (done) return;
       child.stdout.removeListener("data", captureStdout);
       done = true;
