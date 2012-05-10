@@ -195,6 +195,12 @@ module.exports = function setup(fsOptions) {
 
     var child = childProcess.spawn(executablePath, args, options);
     if (options.resumeStdin) child.stdin.resume();
+    if (options.hasOwnProperty('stdoutEncoding')) {
+      child.stdout.setEncoding(options.stdoutEncoding);
+    }
+    if (options.hasOwnProperty('stderrEncoding')) {
+      child.stderr.setEncoding(options.stderrEncoding);
+    }
     callback(null, {
       process: child
     });
@@ -207,6 +213,9 @@ module.exports = function setup(fsOptions) {
     tryConnect();
     function tryConnect() {
       var socket = net.connect(port, function () {
+        if (options.hasOwnProperty('encoding')) {
+          socket.setEncoding(options.encoding);
+        }
         callback(null, {stream:socket});
       });
       socket.once("error", function (err) {
