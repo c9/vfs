@@ -25,7 +25,8 @@ module.exports = function setup(mount, vfs) {
       }
     });
     input.on("end", function () {
-      output.emit("data", "\n]");
+      if (first) output.emit("data", "[]");
+      else output.emit("data", "\n]");
       output.emit("end");
     });
     if (input.pause) {
