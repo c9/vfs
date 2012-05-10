@@ -210,13 +210,17 @@ module.exports = function setup(fsOptions) {
       meta.process.stdout.on("data", function(data) { stdout.push(data); });
       meta.process.stderr.on("data", function(data) { stderr.push(data); });
 
-      meta.process.on("exit", function(code) {
+      meta.process.on("exit", function(code, signal) {
         var err = null;
         stdout = stdout.join("").trim();
         stderr = stderr.join("").trim();
 
         if (code) {
           err = new Error("rm process died");
+          if (signal) {
+            err.message += " because of signal " + signal;
+            err.signal = signal;
+          }
           if (code) {
             err.message += " with exit code " + code;
             err.exitCode = code;
