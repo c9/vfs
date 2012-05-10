@@ -498,16 +498,19 @@ module.exports = function setup(fsOptions) {
   function rmdir(path, options, callback) {
     if (options.recursive) {
       remove(path, function(path, callback) {
-        var rm = spawn("rm", ["-rf", path]);
-        var err = "";
-        rm.on("stderr", function(data) {
-          err += data;
-        });
-        rm.on("exit", function(code) {
-          if (code) {
-            return callback("error removing directory: " + code + " " + err.join(""));
-          }
-          callback();
+        spawn("rm", ["-rf", path], function(err, child) {
+          if (err) return callback(err);
+
+          var err = "";
+          child.on("stderr", function(data) {
+            err += data;
+          });
+          child.on("exit", function(code) {
+            if (code) {
+              return callback("error removing directory: " + code + " " + err.join(""));
+            }
+            callback();
+          });
         });
       }, callback);
     }
