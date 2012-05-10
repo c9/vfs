@@ -200,6 +200,21 @@ module.exports = function setup(fsOptions) {
     });
   }
 
+  function exec(executablePath, options, callback) {
+    spawn(executablePath, options, function(err, meta) {
+      if (err) return callback(err);
+
+      var stdout = [];
+      var stderr = [];
+
+      meta.process.stdout.on("data", stdout.push.bind(stdout, stdout));
+      meta.process.stderr.on("data", stderr.push.bind(stderr, stderr));
+
+      meta.process.on("exit", function(code) {
+        callback(code, stdout.join(""), stderr.join(""));
+      });
+    });
+  }
   function connect(port, options, callback) {
     if (typeof port !== "number") throw new Error("port must be a number");
     var retries = options.hasOwnProperty('retries') ? options.retries : 5;
@@ -498,20 +513,11 @@ module.exports = function setup(fsOptions) {
   function rmdir(path, options, callback) {
     if (options.recursive) {
       remove(path, function(path, callback) {
-        spawn("rm", {args: ["-rf", path]}, function(err, meta) {
-          if (err) return callback(err);
-
-          var child = meta.process;
-          var err = "";
-          child.stderr.on("data", function(data) {
-            err += data;
-          });
-          child.on("exit", function(code) {
-            if (code) {
-              return callback("error removing directory: " + code + " " + err.join(""));
-            }
-            callback();
-          });
+        exec("rm", {args: ["-rf", path]}, function(code, stdout, stderr) {
+          if (code) {
+            return callback("error removing directory: " + code + " " + stderr);
+          }
+          callback();
         });
       }, callback);
     }
