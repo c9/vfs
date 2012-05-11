@@ -77,7 +77,10 @@ module.exports = function setup(fsOptions) {
     rmdir: rmdir,
     rename: rename,
     copy: copy,
-    symlink: symlink
+    symlink: symlink,
+
+    // for internal use only
+    killtree: killtree
   };
 
   // Give this a stat object (or any object containing uid, gid, and mode) and
@@ -206,7 +209,7 @@ module.exports = function setup(fsOptions) {
 
     child.kill = function(signal) {
       killtree(child, signal);
-    }
+    };
 
     callback(null, {
       process: child
@@ -264,9 +267,9 @@ module.exports = function setup(fsOptions) {
         return;
       }
 
-      pidlist.forEach(function (cpid) {
+      pidlist.forEach(function (pid) {
         try {
-          process.kill(cpid, signal);
+          process.kill(pid, signal);
         } catch(e) {
           // kill may throw if the pid does not exist.
         }
