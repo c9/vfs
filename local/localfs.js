@@ -3,6 +3,7 @@ var net = require('net');
 var childProcess = require('child_process');
 var constants = require('constants');
 var join = require('path').join;
+var resolve = require('path').resolve;
 var dirname = require('path').dirname;
 var basename = require('path').basename;
 var Stream = require('stream').Stream;
@@ -113,11 +114,10 @@ module.exports = function setup(fsOptions) {
     });
   }
 
-
   // Realpath a file and check for access
   // callback(err, path)
-  function realpath(path, callback) {
-    fs.realpath(join(root, path), function (err, path) {
+  function realpath(path, callback, alreadyRooted) {
+    fs.realpath(alreadyRooted ? path : join(root, path), function (err, path) {
       if (err) return callback(err);
       if (!(path === base || path.substr(0, root.length) === root)) {
         err = new Error("EACCESS: '" + path + "' not in '" + root + "'");
@@ -410,7 +410,7 @@ module.exports = function setup(fsOptions) {
 
     realpath(path, function (err, path) {
       if (err) return callback(err);
-      statSafe(path, 4, function (err, stat) {
+      statSafe(path, 4/*READ*/, function (err, stat) {
         if (err) return callback(err);
         if (!stat.isDirectory()) {
           return callback(new Error("Requested resource is not a directory"));
@@ -452,7 +452,18 @@ module.exports = function setup(fsOptions) {
             var left = files.length - index;
             var fullpath = join(path, file);
 
-            createStatEntry(file, fullpath, function(entry) {
+            if (stat.access & 1/*EXEC/SEARCH*/) { // Can they enter the directory?
+              createStatEntry(file, fullpath, onStatEntry);
+            }
+            else {
+              var err = new Error("EACCESS: Permission Denied");
+              err.code = "EACCESS";
+              onStatEntry({
+                name: file,
+                err: err
+              });
+            }
+            function onStatEntry(entry) {
               if (encoding === "json")
                 stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
               else
@@ -461,7 +472,7 @@ module.exports = function setup(fsOptions) {
               if (!paused) {
                 getNext();
               }
-            });
+            }
           }
           function done() {
             if (encoding === "json") stream.emit("data", "\n]\n");
@@ -473,14 +484,26 @@ module.exports = function setup(fsOptions) {
   }
 
   function stat(path, options, callback) {
-    realpath(path, function (err, path) {
+    // Make sure the parent directory is accessable
+    realpath(dirname(path), function (err, dir) {
       if (err) return callback(err);
-
-      var file = basename(path);
-      createStatEntry(file, path, callback.bind(this, null));
+      // Make sure they can enter the parent directory too
+      statSafe(dir, 1/*EXEC/SEARCH*/, function (err) {
+        if (err) return callback(err);
+        var file = basename(path);
+        path = join(dir, file);
+        createStatEntry(file, path, function (entry) {
+          if (entry.err) {
+            return callback(entry.err);
+          }
+          callback(null, entry);
+        });
+      });
     });
   }
 
+  // This helper function doesn't follow node conventions in the callback,
+  // there is no err, only entry.
   function createStatEntry(file, fullpath, callback) {
     lstatSafe(fullpath, 0, function (err, stat) {
       var entry = {
@@ -511,10 +534,20 @@ module.exports = function setup(fsOptions) {
         fs.readlink(fullpath, function (err, link) {
           if (err) {
             entry.linkErr = err.stack;
-          } else {
-            entry.link = link;
+            return callback(entry);
           }
-          callback(entry);
+          entry.link = link;
+          realpath(resolve(dirname(fullpath), link), function (err, newpath) {
+            if (err) {
+              entry.linkStatErr = err;
+              return callback(entry);
+            }
+            createStatEntry(basename(newpath), newpath, function (linkStat) {
+              entry.linkStat = linkStat;
+              linkStat.fullPath = newpath.substr(base.length) || "/";
+              return callback(entry);
+            });
+          }, true/*alreadyRooted*/);
         });
       }
     });
