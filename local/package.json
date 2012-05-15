@@ -1,19 +1,27 @@
 {
-  "author": "Tim Caswell <tim@c9.io>",
-  "name": "vfs-local",
-  "description": "A vfs implementation that works on the local filesystem, but with optional security constraints",
-  "version": "0.0.0",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/c9/vfs.git"
-  },
-  "main": "localfs.js",
-  "dependencies": {
-    "simple-mime": "0.0.5"
-  },
-  "devDependencies": {},
-  "optionalDependencies": {},
-  "engines": {
-    "node": ">0.6.16"
-  }
+    "author": "Ajax.org B.V. <info@ajax.org>",
+    "contributors": [
+        { "name": "Tim Caswell", "email": "tim@c9.io>" },
+        { "name": "Fabian Jakobs", "email": "fabian@c9.io" }
+    ],
+    "name": "vfs-local",
+    "description": "A vfs implementation that works on the local filesystem, but with optional security constraints",
+    "version": "0.0.1",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/c9/vfs.git"
+    },
+    "main": "localfs.js",
+    "dependencies": {
+        "simple-mime": "0.0.5"
+    },
+    "devDependencies": {},
+    "optionalDependencies": {},
+    "licenses" : [{
+        "type" : "MIT",
+        "url" : "http://github.com/c9/vfs/raw/master/local/LICENSE"
+    }],
+    "engines": {
+        "node": ">0.6.16"
+    }
 }

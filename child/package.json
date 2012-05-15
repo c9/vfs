@@ -1,18 +1,25 @@
 {
-    "author": "Tim Caswell <tim@c9.io>",
+    "author": "Ajax.org B.V. <info@ajax.org>",
+    "contributors": [
+        { "name": "Tim Caswell", "email": "tim@c9.io>" }
+    ],
     "name": "vfs-child",
     "description": "A vfs that runs in a child process.",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "repository": {
         "type": "git",
         "url": "git://github.com/c9/vfs.git"
     },
     "main": "parent.js",
     "dependencies": {
-        "vfs-socket": "~0.0.0"
+        "vfs-socket": "~0.0.1"
     },
     "devDependencies": {},
     "optionalDependencies": {},
+    "licenses" : [{
+        "type" : "MIT",
+        "url" : "http://github.com/c9/vfs/raw/master/child/LICENSE"
+    }],
     "engines": {
         "node": ">0.6.16"
     }
