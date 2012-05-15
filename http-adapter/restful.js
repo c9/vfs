@@ -277,6 +277,13 @@ module.exports = function setup(mount, vfs) {
         });
       });
     } // end POST commands
+    else if (req.method === "PROPFIND") {
+      vfs.stat(path, {}, function (err, meta) {
+        if (err) return abort(err);
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify(meta) + "\n");
+      });
+    }
     else {
       return abort("Unsupported HTTP method", 501);
     }
