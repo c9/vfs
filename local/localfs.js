@@ -46,11 +46,17 @@ module.exports = function setup(fsOptions) {
 
   var umask = fsOptions.umask || 0750;
   var checkPermissions, fsUid, fsGid;
+
   if (fsOptions.hasOwnProperty("uid") || fsOptions.hasOwnProperty("gid")) {
     if (typeof fsOptions.uid === "number" || typeof fsOptions.uid === "number") {
-      checkPermissions = true; // Tell the system to not assume anything.
       fsUid = fsOptions.uid || process.getuid();
       fsGid = fsOptions.gid || process.getgid();
+
+      // only do the extra checks if the fs uid/gid is different to the logged
+      // in user
+      if (fsGid !== process.getgid() || fsUid !== process.getuid()) {
+        checkPermissions = true; // Tell the system to not assume anything.
+      }
     }
   } else {
     if (process.getuid() === 0) throw new Error("Please specify uid or gid when running as root");
