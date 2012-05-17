@@ -204,7 +204,11 @@ module.exports = function setup(fsOptions) {
       options.gid = fsOptions.gid;
     }
 
-    var child = childProcess.spawn(executablePath, args, options);
+    try {
+      var child = childProcess.spawn(executablePath, args, options);
+    } catch (e) {
+      return callback(e);
+    }
     if (options.resumeStdin) child.stdin.resume();
     if (options.hasOwnProperty('stdoutEncoding')) {
       child.stdout.setEncoding(options.stdoutEncoding);
