@@ -529,6 +529,7 @@ module.exports = function setup(fsOptions) {
       } else {
         entry.access = stat.access;
         entry.size = stat.size;
+        entry.mtime = stat.mtime.valueOf();
 
         if (stat.isDirectory()) {
           entry.mime = "inode/directory";
