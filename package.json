@@ -1,5 +1,11 @@
 {
     "name": "vfs",
     "version": "0.0.2",
-    "private": true
+    "private": true,
+
+    "dependencies": {
+        "simple-mime": "0.0.5",
+        "architect-agent": "~0.2.1",
+        "architect-socket-transport": "~0.2.1"
+    }
 }
