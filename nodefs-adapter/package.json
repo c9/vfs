@@ -1,0 +1,24 @@
+{
+    "author": "Ajax.org B.V. <info@ajax.org>",
+    "contributors": [
+        { "name": "Faian Jakobs", "email": "fabian@c9.io>" }
+    ],
+    "name": "vfs-nodefs-adapter",
+    "description": "Wraps a vfs instance in a node fs style interface",
+    "version": "0.0.1",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/c9/vfs.git"
+    },
+    "main": "nodefs.js",
+    "dependencies": {},
+    "devDependencies": {},
+    "optionalDependencies": {},
+    "licenses" : [{
+        "type" : "MIT",
+        "url" : "http://github.com/c9/vfs/raw/master/http-adapter/LICENSE"
+    }],
+    "engines": {
+       "node": "*"
+    }
+}
