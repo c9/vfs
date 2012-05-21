@@ -100,10 +100,15 @@ module.exports = function(vfs) {
         });
     }
 
+    function rename(from, to, callback) {
+        vfs.rename(to, {from: from}, callback);
+    }
+
     return {
         readFile: readFile,
         writeFile: writeFile,
         readdir: readdir,
-        exists: exists
+        exists: exists,
+        rename: rename
     }
 }
