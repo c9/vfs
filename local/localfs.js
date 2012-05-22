@@ -204,6 +204,10 @@ module.exports = function setup(fsOptions) {
       options.gid = fsOptions.gid;
     }
 
+    if (options.hasOwnProperty('env')) {
+      options.env.__proto__ = process.env;
+    }
+
     try {
       var child = childProcess.spawn(executablePath, args, options);
     } catch (e) {
