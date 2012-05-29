@@ -1,11 +1,16 @@
-// Tiny stub to create a vfs-socket instance and connect it to stdin using
-// config options from argv[2].
+var Worker = require('vfs-socket/worker').Worker;
+// Create a local vfs from the config at argv[2]
+console.log = console.error;
 var config = JSON.parse(process.argv[2]);
-config.input = process.stdin;
-var vfs = require('vfs-socket/worker')(config);
-
-config.input.on("close", function() {
+var vfs = require('vfs-local')(config);
+// Wrap the vfs in a worker agent
+var worker = new Worker(vfs);
+// Connect the agent to stdin (a duplex pipe)
+worker.connect([process.stdin, process.stdout]);
+// Kill self and all children if the connection goes down
+worker.on("disconnect", function (err) {
+  if (err) console.error(err.stack);
   vfs.killtree(process.pid, "SIGKILL");
 });
-
+// Let it begin
 process.stdin.resume();

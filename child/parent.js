@@ -1,11 +1,12 @@
-var consumer = require('vfs-socket/consumer');
+var Consumer = require('vfs-socket/consumer').Consumer;
+var inherits = require('util').inherits;
 var spawn = require('child_process').spawn;
-var Pipe;
 
-// Simple vfs that uses vfs-socket over a parent-child process relationship
-module.exports = function setup(fsOptions, callback) {
-    if (!Pipe) Pipe = process.binding('pipe_wrap').Pipe;
-    var options = { customFds: [-1, 1, 2], stdinStream: new Pipe(true) };
+exports.Parent = Parent;
+
+function Parent(fsOptions) {
+    Consumer.call(this);
+    var options = {};
     if (fsOptions.hasOwnProperty("gid")) {
         options.gid = fsOptions.gid;
         delete fsOptions.gid;
@@ -16,14 +17,27 @@ module.exports = function setup(fsOptions, callback) {
     }
     var args = [require.resolve('./child.js'), JSON.stringify(fsOptions)];
     var executablePath = process.execPath;
+    var child;
 
-    var child = spawn(executablePath, args, options);
+    // Override Consumer's connect since the transport logic is internal to this module
+    this.connect = connect.bind(this);
+    function connect(callback) {
+        child = this.child = spawn(executablePath, args, options);
+        child.stderr.pipe(process.stderr, { end: false });
+        child.stdin.readable = true;
+        var self = this;
+        Consumer.prototype.connect.call(this, [child.stdout, child.stdin], callback);
+        child.stdin.resume();
+        child.on("exit", disconnect);
+    };
 
-    child.stdin.resume();
-    child.stdin.readable = true;
-
-    var remote = consumer({input: child.stdin}, function (err, remote) {
-      if (callback) callback(err, remote);
-    });
-    return remote;
+    // Override Consumer's disconnect to kill the child process afterwards
+    this.disconnect = disconnect.bind(this);
+    function disconnect() {
+        if (!this.transport) return;
+        Consumer.prototype.disconnect.call(this);
+        child.kill();
+    };
 }
+inherits(Parent, Consumer);
+

@@ -5,14 +5,15 @@
     ],
     "name": "vfs-child",
     "description": "A vfs that runs in a child process.",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "repository": {
         "type": "git",
         "url": "git://github.com/c9/vfs.git"
     },
     "main": "parent.js",
     "dependencies": {
-        "vfs-socket": "~0.0.1"
+        "vfs-socket": "~0.1.0",
+        "vfs-local": "~0.0.2"
     },
     "devDependencies": {},
     "optionalDependencies": {},
@@ -21,6 +22,6 @@
         "url" : "http://github.com/c9/vfs/raw/master/child/LICENSE"
     }],
     "engines": {
-        "node": ">0.6.16"
+        "node": "~0.6.16"
     }
 }
