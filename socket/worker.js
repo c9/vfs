@@ -1,23 +1,39 @@
 var Stream = require('stream').Stream;
-var socketTransport = require('architect-socket-transport');
-var Agent = require('architect-agent').Agent;
-var vfsLocal = require('vfs-local');
+var inherits = require('util').inherits;
+var Agent = require('smith').Agent;
 
-// @fsOptions can have:
-//   all fs options from vfs-local
-//   and also:
-//   fsOptions.input - input stream
-//   fsOptions.output - output stream (reuses input if not given)
-//   fsOptions.callback - get's called with the remote once connected
-module.exports = function setup(fsOptions) {
-    var input = fsOptions.input;
-    if (!(input instanceof Stream && input.readable !== false)) throw new TypeError("input must be a readable Stream");
-    var output = fsOptions.hasOwnProperty("output") ? fsOptions.output : input;
-    if (!(output instanceof Stream && output.writable !== false)) throw new TypeError("output must be a writable Stream");
+exports.Worker = Worker;
+
+// Worker is a smith.Agent that wraps the vfs api passed to it.  It's works in
+// tandem with Consumer agents on the other side.
+function Worker(vfs) {
+    Agent.call(this, {
+        // And stream endpoints for writable streams to receive their data
+        write: write,
+        end: end,
+        destroy: destroy,
+        kill: kill,
+        ping: ping,
+        // Route other calls to the local vfs instance
+        spawn: route("spawn"),
+        exec: route("exec"),
+        connect: route("connect"),
+        readfile: route("readfile"),
+        mkfile: route("mkfile"),
+        rmfile: route("rmfile"),
+        readdir: route("readdir"),
+        stat: route("stat"),
+        mkdir: route("mkdir"),
+        rmdir: route("rmdir"),
+        rename: route("rename"),
+        copy: route("copy"),
+        symlink: route("symlink")
+    });
 
     var streams = {};
     var processes = {};
-    var remote;
+    var self = this;
+    var remote = this.remoteApi;
 
     var nextID = 1;
     function getID() {
@@ -31,10 +47,9 @@ module.exports = function setup(fsOptions) {
         stream.id = id;
         if (stream.readable) {
             stream.on("data", function (chunk) {
-                var ret = remote.send(["onData", id, chunk], function () {
-                    stream.resume();
-                });
-                if (ret === false) stream.pause();
+                if (remote.onData(id, chunk) === false) {
+                    stream.pause();
+                }
             });
             stream.on("end", function () {
                 remote.onEnd(id);
@@ -132,38 +147,5 @@ module.exports = function setup(fsOptions) {
             });
         }
     }
-
-    // Get the local vfs and wrap it so we can fix streams
-    var vfs = vfsLocal(fsOptions);
-
-    var agent = new Agent({
-        // And stream endpoints for writable streams to receive their data
-        write: write,
-        end: end,
-        destroy: destroy,
-        kill: kill,
-        ping: ping,
-        // Route other calls to the local vfs instance
-        spawn: route("spawn"),
-        exec: route("exec"),
-        connect: route("connect"),
-        readfile: route("readfile"),
-        mkfile: route("mkfile"),
-        rmfile: route("rmfile"),
-        readdir: route("readdir"),
-        stat: route("stat"),
-        mkdir: route("mkdir"),
-        rmdir: route("rmdir"),
-        rename: route("rename"),
-        copy: route("copy"),
-        symlink: route("symlink")
-    });
-
-    agent.attach(socketTransport(input, output), function (consumer) {
-        remote = consumer;
-        if (fsOptions.callback) fsOptions.callback(consumer);
-    });
-
-    // Pass through the original local vfs in case it's wanted.
-    return vfs;
-};
+}
+inherits(Worker, Agent);
