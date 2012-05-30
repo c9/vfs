@@ -246,7 +246,7 @@ module.exports = function setup(fsOptions) {
         stderr = stderr.join("").trim();
 
         if (code || signal) {
-          err = new Error("rm process died");
+          err = new Error("process died");
           if (signal) {
             err.message += " because of signal " + signal;
             err.signal = signal;
@@ -263,7 +263,7 @@ module.exports = function setup(fsOptions) {
             err.message += "\n" + stderr;
             err.stderr = stderr;
           }
-          return callback(err);
+          return callback(err, stdout, stderr);
         }
 
         callback(err, stdout, stderr);
