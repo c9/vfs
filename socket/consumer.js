@@ -1,4 +1,5 @@
 var Stream = require('stream').Stream;
+var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Agent = require('smith').Agent;
 
