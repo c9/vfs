@@ -22,7 +22,7 @@ function Parent(fsOptions) {
     // Override Consumer's connect since the transport logic is internal to this module
     this.connect = connect.bind(this);
     function connect(callback) {
-        child = this.child = spawn(executablePath, args, options);
+        child = spawn(executablePath, args, options);
         child.stderr.pipe(process.stderr, { end: false });
         child.stdin.readable = true;
         var self = this;
@@ -35,7 +35,7 @@ function Parent(fsOptions) {
     this.disconnect = disconnect.bind(this);
     function disconnect() {
         if (!this.transport) return;
-        Consumer.prototype.disconnect.call(this);
+        Consumer.prototype.disconnect.apply(this, arguments);
         child.kill();
     };
 }
