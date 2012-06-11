@@ -30,6 +30,7 @@ function Worker(vfs) {
         copy: route("copy"),
         symlink: route("symlink"),
         watch: route("watch"),
+        changedSince: route("changedSince"),
     });
 
     var streams = {};

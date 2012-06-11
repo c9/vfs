@@ -86,7 +86,7 @@ module.exports = function setup(fsOptions) {
     symlink: symlink,
 
     watch: watch,
-    getchanges: getchanges,
+    changedSince: changedSince,
 
     // for internal use only
     killtree: killtree
@@ -748,8 +748,47 @@ module.exports = function setup(fsOptions) {
     });
   }
 
-  function getchanges(path, options, callback) {
-    callback(new Error("Not implemented"));
+  function changedSince(paths, options, callback) {
+    if (!options.since) {
+      return callback(new Error("since is a required option"));
+    }
+    if (!Array.isArray(paths)) {
+      return callback(new Error("paths must be an array"));
+    }
+    var since = (new Date(options.since)).getTime();
+    var length = paths.length;
+    var meta = {};
+    var changed = meta.changed = [];
+    var errors = {};
+    var offset = 0;
+    (function next() {
+      if (offset === length) done();
+      var filePath = paths[offset];
+      realpath(filePath, function (err, path) {
+        if (err) {
+          errors[filePath] = err;
+          return next();
+        }
+        fs.stat(path, function (err, stat) {
+          if (err) {
+            errors[filePath] = err;
+            return next();
+          }
+          var mtime = stat.mtime.getTime();
+          if (mtime > since) {
+            changed.push(filePath);
+          }
+          next();
+        });
+      });
+      offset++;
+    }());
+    function done() {
+      if (Object.keys(errors).length) {
+        meta.errors = errors;
+      }
+      callback(null, meta);
+    }
   }
 
 };
