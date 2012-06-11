@@ -85,6 +85,9 @@ module.exports = function setup(fsOptions) {
     copy: copy,
     symlink: symlink,
 
+    watch: watch,
+    getchanges: getchanges,
+
     // for internal use only
     killtree: killtree
   };
@@ -732,5 +735,22 @@ module.exports = function setup(fsOptions) {
       });
     });
   }
+
+  // Simple wrapper around node's fs.watch function.  Returns a watcher object
+  // that emits "change" events.  Make sure to call .close() when done to
+  // prevent leaks.
+  function watch(path, options, callback) {
+    var meta = {};
+    realpath(path, function (err, path) {
+      if (err) return callback(err);
+      meta.watcher = fs.watch(path, options, function (event, filename) {});
+      callback(null, meta);
+    });
+  }
+
+  function getchanges(path, options, callback) {
+    callback(new Error("Not implemented"));
+  }
+
 };
 
