@@ -11,11 +11,13 @@ function Consumer() {
         onExit: onExit,
         onData: onData,
         onEnd: onEnd,
-        onClose: onClose
+        onClose: onClose,
+        onChange: onChange,
     });
 
     var proxyStreams = {}; // Stream proxies given us by the other side
     var proxyProcesses = {}; // Process proxies given us by the other side
+    var proxyWatchers = {}; // Watcher proxies given us by the other side
 
     this.vfs = {
         ping: ping, // Send a simple ping request to the worker
@@ -32,6 +34,7 @@ function Consumer() {
         rename: route("rename"),
         copy: route("copy"),
         symlink: route("symlink"),
+        watch: route("watch"),
     }
     var remote = this.remoteApi;
 
@@ -83,6 +86,17 @@ function Consumer() {
         return process;
     }
 
+    function makeWatcherProxy(token) {
+        var watcher = new EventEmitter();
+        var id = token.id;
+        watcher.id = id;
+        proxyWatchers[id] = watcher;
+        watcher.close = function () {
+            remote.close(id);
+        };
+        return watcher;
+    }
+
     function onExit(pid, code, signal) {
         var process = proxyProcesses[pid];
         process.emit("exit", code, signal);
@@ -107,6 +121,12 @@ function Consumer() {
         delete proxyStreams[id];
     }
 
+    function onChange(id, event, filename) {
+        var watcher = proxyWatchers[id];
+        if (!watcher) return;
+        watcher.emit("change", event, filename);
+    }
+
     // Return fake endpoints in the initial return till we have the real ones.
     function route(name) {
         return function (path, options, callback) {
@@ -117,6 +137,9 @@ function Consumer() {
                 }
                 if (meta.process) {
                     meta.process = makeProcessProxy(meta.process);
+                }
+                if (meta.watcher) {
+                    meta.watcher = makeWatcherProxy(meta.watcher);
                 }
                 return callback(null, meta);
             });

@@ -13,6 +13,7 @@ function Worker(vfs) {
         end: end,
         destroy: destroy,
         kill: kill,
+        close: close,
         ping: ping,
         // Route other calls to the local vfs instance
         spawn: route("spawn"),
@@ -27,10 +28,12 @@ function Worker(vfs) {
         rmdir: route("rmdir"),
         rename: route("rename"),
         copy: route("copy"),
-        symlink: route("symlink")
+        symlink: route("symlink"),
+        watch: route("watch"),
     });
 
     var streams = {};
+    var watchers = {};
     var processes = {};
     var self = this;
     var remote = this.remoteApi;
@@ -87,6 +90,17 @@ function Worker(vfs) {
         return token;
     }
 
+    function storeWatcher(watcher) {
+        var id = getID();
+        watchers[id] = watcher;
+        watcher.id = id;
+        watcher.on("change", function (event, filename) {
+            remote.onChange(id, event, filename);
+        });
+        var token = {id: id};
+        return token;
+    }
+
     // Remote side writing to our local writable streams
     function write(id, chunk) {
         // They want to write to our real stream
@@ -116,6 +130,12 @@ function Worker(vfs) {
         process.kill(code);
     }
 
+    function close(id) {
+        var watcher = watchers[id];
+        delete watchers[id];
+        watcher.close();
+    }
+
     // Can be used for keepalive checks.
     function ping(callback) {
         callback();
@@ -141,6 +161,9 @@ function Worker(vfs) {
                 }
                 if (meta.process) {
                     meta.process = storeProcess(meta.process);
+                }
+                if (meta.watcher) {
+                    meta.watcher = storeWatcher(meta.watcher);
                 }
                 // Call the remote callback with the result
                 callback(null, meta);
