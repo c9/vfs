@@ -93,6 +93,7 @@ function Consumer() {
         proxyWatchers[id] = watcher;
         watcher.close = function () {
             remote.close(id);
+            delete proxyWatchers[id];
         };
         return watcher;
     }
