@@ -104,11 +104,16 @@ module.exports = function(vfs) {
         vfs.rename(to, {from: from}, callback);
     }
 
+    function mkdirP(path, callback) {
+        vfs.exec("mkdir", {args: ["-p", path]}, callback);
+    }
+
     return {
         readFile: readFile,
         writeFile: writeFile,
         readdir: readdir,
         exists: exists,
-        rename: rename
+        rename: rename,
+        mkdirP: mkdirP
     }
 }
