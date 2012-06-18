@@ -47,6 +47,12 @@ module.exports = function setup(fsOptions) {
   var umask = fsOptions.umask || 0750;
   var checkPermissions, fsUid, fsGid;
 
+  if (fsOptions.hasOwnProperty('defaultEnv')) {
+    fsOptions.defaultEnv.__proto__ = process.env;
+  } else {
+    fsOptions.defaultEnv = process.env;
+  }
+
   if (fsOptions.hasOwnProperty("uid") || fsOptions.hasOwnProperty("gid")) {
     if (typeof fsOptions.uid === "number" || typeof fsOptions.uid === "number") {
       fsUid = fsOptions.uid || process.getuid();
@@ -208,7 +214,9 @@ module.exports = function setup(fsOptions) {
     }
 
     if (options.hasOwnProperty('env')) {
-      options.env.__proto__ = process.env;
+      options.env.__proto__ = fsOptions.defaultEnv;
+    } else {
+      options.env = fsOptions.defaultEnv;
     }
 
     try {
