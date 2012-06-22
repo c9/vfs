@@ -430,11 +430,6 @@ module.exports = function setup(fsOptions) {
   // The order of the files in undefined.  The client should sort afterwards.
   function readdir(path, options, callback) {
     var meta = {};
-    var encoding = "json";
-    if (options.hasOwnProperty("encoding")) encoding = options.encoding;
-    if (!(!encoding || encoding === "json")) {
-      return callback(new Error("encoding must be null or 'json'"));
-    }
 
     realpath(path, function (err, path) {
       if (err) return callback(err);
@@ -453,7 +448,6 @@ module.exports = function setup(fsOptions) {
 
         fs.readdir(path, function (err, files) {
           if (err) return callback(err);
-          if (encoding === "json") meta.mime = "application/json";
           if (options.head) {
             return callback(null, meta);
           }
@@ -471,7 +465,6 @@ module.exports = function setup(fsOptions) {
           };
           meta.stream = stream;
           callback(null, meta);
-          if (encoding === "json") stream.emit("data", "[");
           var index = 0;
           stream.resume();
           function getNext() {
@@ -492,10 +485,7 @@ module.exports = function setup(fsOptions) {
               });
             }
             function onStatEntry(entry) {
-              if (encoding === "json")
-                stream.emit("data", "\n  " + JSON.stringify(entry) + (left ? ",":""));
-              else
-                stream.emit("data", entry);
+              stream.emit("data", entry);
 
               if (!paused) {
                 getNext();
@@ -503,7 +493,6 @@ module.exports = function setup(fsOptions) {
             }
           }
           function done() {
-            if (encoding === "json") stream.emit("data", "\n]\n");
             stream.emit("end");
           }
         });
