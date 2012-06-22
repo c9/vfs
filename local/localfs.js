@@ -395,8 +395,22 @@ module.exports = function setup(fsOptions) {
       // Range support
       if (options.hasOwnProperty('range') && !(options.range.etag && options.range.etag !== meta.etag)) {
         var range = options.range;
-        var start = range.hasOwnProperty("start") ? range.start : 0;
-        var end = range.hasOwnProperty("end") ? range.end : stat.size - 1;
+        var start, end;
+        if (range.hasOwnProperty("start")) {
+          start = range.start;
+          end = range.hasOwnProperty("end") ? range.end : meta.size - 1;
+        }
+        else {
+          if (range.hasOwnProperty("end")) {
+            start = meta.size - range.end;
+            end = meta.size - 1;
+          }
+          else {
+            meta.rangeNotSatisfiable = "Invalid Range";
+            fs.close(fd);
+            return callback(null, meta);
+          }
+        }
         if (end < start || start < 0 || end >= stat.size) {
           meta.rangeNotSatisfiable = "Range out of bounds";
           fs.close(fd);
