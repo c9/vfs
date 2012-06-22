@@ -13,7 +13,7 @@ module.exports = function setup(mount, vfs) {
     input.on("data", function (entry) {
       if (path) {
         entry.href = path + entry.name;
-        if (entry.mime === "inode/directory") {
+        if (entry.mime.match(/(directory|folder)$/)) {
           entry.href += "/";
         }
       }
