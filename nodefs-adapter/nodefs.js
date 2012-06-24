@@ -124,6 +124,7 @@ module.exports = function(vfs, base) {
         readdir: readdir,
         exists: exists,
         rename: rename,
-        mkdirP: mkdirP
+        mkdirP: mkdirP,
+        vfs: vfs
     }
 }
