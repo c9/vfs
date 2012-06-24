@@ -1,4 +1,14 @@
-module.exports = function(vfs) {
+
+const PATH = require("path");
+
+module.exports = function(vfs, base) {
+
+    function resolvePath(path) {
+        if (typeof base === "undefined") {
+            return path;
+        }
+        return PATH.join(base, path);
+    }
 
     function readFile(path, encoding, callback) {
         if (!callback) {
@@ -10,7 +20,7 @@ module.exports = function(vfs) {
         if (encoding)
             options.encoding = encoding;
 
-        vfs.readfile(path, options, function(err, meta) {
+        vfs.readfile(resolvePath(path), options, function(err, meta) {
             if (err)
                 return callback(err);
 
@@ -44,7 +54,7 @@ module.exports = function(vfs) {
         if (encoding)
             options.encoding = encoding;
 
-        vfs.mkfile(path, options, function(err, meta) {
+        vfs.mkfile(resolvePath(path), options, function(err, meta) {
             if (err)
                 return callback(err);
 
@@ -68,7 +78,7 @@ module.exports = function(vfs) {
     }
 
     function readdir(path, callback) {
-        vfs.readdir(path, {encoding: null}, function(err, meta) {
+        vfs.readdir(resolvePath(path), {encoding: null}, function(err, meta) {
             if (err)
                 return callback(err);
 
@@ -95,17 +105,17 @@ module.exports = function(vfs) {
     }
 
     function exists(path, callback) {
-        vfs.stat(path, {}, function(err, stat) {
+        vfs.stat(resolvePath(path), {}, function(err, stat) {
             return callback(stat && !stat.err);
         });
     }
 
     function rename(from, to, callback) {
-        vfs.rename(to, {from: from}, callback);
+        vfs.rename(resolvePath(to), {from: resolvePath(from)}, callback);
     }
 
     function mkdirP(path, callback) {
-        vfs.exec("mkdir", {args: ["-p", path]}, callback);
+        vfs.exec("mkdir", {args: ["-p", resolvePath(path)]}, callback);
     }
 
     return {
