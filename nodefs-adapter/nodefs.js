@@ -3,12 +3,9 @@ const PATH = require("path");
 
 module.exports = function(vfs, base) {
 
-    function resolvePath(path) {
-        if (typeof base === "undefined") {
-            return path;
-        }
-        return PATH.join(base, path);
-    }
+    var resolvePath = base 
+        ? function(path) { return path; }
+        : function(path) { return PATH.join(base, path) };
 
     function readFile(path, encoding, callback) {
         if (!callback) {
@@ -114,8 +111,16 @@ module.exports = function(vfs, base) {
         vfs.rename(resolvePath(to), {from: resolvePath(from)}, callback);
     }
 
-    function mkdirP(path, callback) {
+    function mkdirP(path, mode, callback) {
+        if (!callback) {
+            callback = mode;
+            mode = null;
+        }
         vfs.exec("mkdir", {args: ["-p", resolvePath(path)]}, callback);
+    }
+
+    function unlink(path, callback) {
+        vfs.rmfile(resolvePath(path), {}, callback);
     }
 
     return {
@@ -125,6 +130,7 @@ module.exports = function(vfs, base) {
         exists: exists,
         rename: rename,
         mkdirP: mkdirP,
+        unlink: unlink,
         vfs: vfs
     }
 }
