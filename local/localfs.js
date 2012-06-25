@@ -31,6 +31,29 @@ function calcEtag(stat) {
   return (stat.isFile() ? '': 'W/') + '"' + stat.ino.toString(36) + "-" + stat.size.toString(36) + "-" + stat.mtime.valueOf().toString(36) + '"';
 }
 
+// Simple type checking helper.
+function checkType(vars, callback) {
+  if (typeof callback !== "function") {
+    throw new TypeError("Please pass in a function for the callback");
+  }
+  var errors = [];
+  for (var i = 0, l = vars.length; i < l; i += 3) {
+    var name = vars[i];
+    var value = vars[i + 1];
+    var expectedType = vars[i + 2];
+    var actualType = value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
+    if (actualType !== expectedType) {
+      errors += "Expected " + name + " to be " + expectedType + " but was " + actualType;
+    }
+  }
+  if (errors.length) {
+    callback (new TypeError(errors.join("\n")));
+    return false;
+  }
+  return true;
+}
+
+
 // @fsOptions can have:
 //   fsOptions.uid - restricts access as if this user was running as
 //   fsOptions.gid   this uid/gid, create files as this user.
@@ -194,7 +217,7 @@ module.exports = function setup(fsOptions) {
           case "r": requestedPermissions = 4; break;
           case "w": case "a": requestedPermissions = 2; break;
           case "r+": case "w+": case "a+": requestedPermissions = 6; break;
-          default: throw new Error("Invalid flag " + flags);
+          default: return callback(new Error("Invalid flag " + flags));
         }
         fstatSafe(fd, requestedPermissions, function (err, stat) {
           if (err) return callback(err);
@@ -205,6 +228,11 @@ module.exports = function setup(fsOptions) {
   }
 
   function spawn(executablePath, options, callback) {
+    if (!checkType([
+      "executablePath", executablePath, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     var args = options.args || [];
     if (checkPermissions && fsOptions.hasOwnProperty('uid')) {
       options.uid = fsOptions.uid;
@@ -241,7 +269,12 @@ module.exports = function setup(fsOptions) {
     });
   }
 
+
   function exec(executablePath, options, callback) {
+    if (!checkType([
+      "executablePath", executablePath, "string",
+      "options", options, "object",
+    ], callback)) return;
     spawn(executablePath, options, function(err, meta) {
       if (err) return callback(err);
 
@@ -326,7 +359,11 @@ module.exports = function setup(fsOptions) {
   }
 
   function connect(port, options, callback) {
-    if (typeof port !== "number") throw new Error("port must be a number");
+    if (!checkType([
+      "port", port, "number",
+      "options", options, "object",
+    ], callback)) return;
+
     var retries = options.hasOwnProperty('retries') ? options.retries : 5;
     var retryDelay = options.hasOwnProperty('retryDelay') ? options.retryDelay : 50;
     tryConnect();
@@ -371,6 +408,11 @@ module.exports = function setup(fsOptions) {
   //     meta.etag - the etag of the file (embeds inode, size and mtime)
   //     meta.stream - a readable stream if the response should have a body.
   function readfile(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     var meta = {};
 
     open(path, "r", umask & 0666, function (err, path, fd, stat) {
@@ -443,6 +485,11 @@ module.exports = function setup(fsOptions) {
   // Reads a directory and streams data about the files as json.
   // The order of the files in undefined.  The client should sort afterwards.
   function readdir(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     var meta = {};
 
     realpath(path, function (err, path) {
@@ -515,6 +562,11 @@ module.exports = function setup(fsOptions) {
   }
 
   function stat(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     // Make sure the parent directory is accessable
     realpath(dirname(path), function (err, dir) {
       if (err) return callback(err);
@@ -588,6 +640,11 @@ module.exports = function setup(fsOptions) {
   // This is used for creating / overwriting files.  It always creates a new tmp
   // file and then renamed to the final destination.
   function mkfile(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     var meta = {};
 
     // Make sure the user has access to the directory and get the real path.
@@ -638,6 +695,11 @@ module.exports = function setup(fsOptions) {
   }
 
   function mkdir(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     var meta = {};
     // Make sure the user has access to the parent directory and get the real path.
     realpath(dirname(path), function (err, dir) {
@@ -675,6 +737,11 @@ module.exports = function setup(fsOptions) {
   }
 
   function rmdir(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     if (options.recursive) {
       remove(path, function(path, callback) {
         exec("rm", {args: ["-rf", path]}, callback);
@@ -686,10 +753,20 @@ module.exports = function setup(fsOptions) {
   }
 
   function rmfile(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     remove(path, fs.unlink, callback);
   }
 
   function rename(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     var meta = {};
     // Get real path to target dir
     realpath(dirname(path), function (err, dir) {
@@ -717,6 +794,11 @@ module.exports = function setup(fsOptions) {
   // Copy is just piping a readstream to a writestream, so let's reuse the
   // existing functions.
   function copy(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     var meta = {};
     mkfile(path, {}, function (err, writeMeta) {
       if (err) return callback(err);
@@ -732,6 +814,11 @@ module.exports = function setup(fsOptions) {
   }
 
   function symlink(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     var meta = {};
     // Get real path to target dir
     realpath(dirname(path), function (err, dir) {
@@ -751,6 +838,11 @@ module.exports = function setup(fsOptions) {
   // that emits "change" events.  Make sure to call .close() when done to
   // prevent leaks.
   function watch(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
     var meta = {};
     realpath(path, function (err, path) {
       if (err) return callback(err);
@@ -760,11 +852,13 @@ module.exports = function setup(fsOptions) {
   }
 
   function changedSince(paths, options, callback) {
+    if (!checkType([
+      "paths", paths, "array",
+      "options", options, "object",
+    ], callback)) return;
+
     if (!options.since) {
       return callback(new Error("since is a required option"));
-    }
-    if (!Array.isArray(paths)) {
-      return callback(new Error("paths must be an array"));
     }
     var since = (new Date(options.since)).getTime();
     var length = paths.length;

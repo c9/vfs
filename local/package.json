@@ -6,7 +6,7 @@
     ],
     "name": "vfs-local",
     "description": "A vfs implementation that works on the local filesystem, but with optional security constraints",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "repository": {
         "type": "git",
         "url": "git://github.com/c9/vfs.git"
@@ -22,6 +22,6 @@
         "url" : "http://github.com/c9/vfs/raw/master/local/LICENSE"
     }],
     "engines": {
-        "node": ">0.6.16"
+        "node": ">=0.6.16"
     }
 }
