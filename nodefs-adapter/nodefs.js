@@ -107,6 +107,10 @@ module.exports = function(vfs, base) {
         });
     }
 
+    function stat(path, callback) {
+        vfs.stat(resolvePath(path), {}, callback);
+    }
+
     function rename(from, to, callback) {
         vfs.rename(resolvePath(to), {from: resolvePath(from)}, callback);
     }
@@ -132,6 +136,7 @@ module.exports = function(vfs, base) {
         writeFile: writeFile,
         readdir: readdir,
         exists: exists,
+        stat: stat,
         rename: rename,
         mkdirP: mkdirP,
         unlink: rmfile,
