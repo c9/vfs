@@ -5,7 +5,7 @@
     ],
     "name": "vfs-nodefs-adapter",
     "description": "Wraps a vfs instance in a node fs style interface",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "repository": {
         "type": "git",
         "url": "git://github.com/c9/vfs.git"
