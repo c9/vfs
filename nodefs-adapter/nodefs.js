@@ -4,7 +4,12 @@ const PATH = require("path");
 module.exports = function(vfs, base) {
 
     var resolvePath = base 
-        ? function(path) { return PATH.join(base, path); }
+        ? function(path) { 
+	        if (path.substring(0, base.length) === base) {
+	            return path;
+	        }
+			return PATH.join(base, path);
+		}
         : function(path) { return path; };
 
     function readFile(path, encoding, callback) {
