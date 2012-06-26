@@ -123,6 +123,10 @@ module.exports = function(vfs, base) {
         vfs.exec("mkdir", {args: ["-p", resolvePath(path)]}, callback);
     }
 
+    function mkdir(path, callback) {
+        vfs.exec("mkdir", {args: [resolvePath(path)]}, callback);
+    }
+
     function rmfile(path, callback) {
         vfs.rmfile(resolvePath(path), {}, callback || function(){}); // shouldn't vfs handle callback == null?
     }
@@ -139,6 +143,7 @@ module.exports = function(vfs, base) {
         stat: stat,
         rename: rename,
         mkdirP: mkdirP,
+        mkdir: mkdir,
         unlink: rmfile,
         rmfile: rmfile,
         rmdir: rmdir,
