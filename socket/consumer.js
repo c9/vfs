@@ -45,7 +45,7 @@ function Consumer() {
             var stream = proxyStreams[id];
             if (stream.writable) stream.emit("drain");
         });
-    })
+    });
 
     // options.id, options.readable, options.writable
     function makeStreamProxy(token) {

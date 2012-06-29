@@ -39,6 +39,14 @@ function Worker(vfs) {
     var self = this;
     var remote = this.remoteApi;
 
+    // Resume readable streams that we paused when the channel drains
+    this.on("drain", function () {
+        Object.keys(streams).forEach(function (id) {
+            var stream = streams[id];
+            if (stream.readable && stream.resume) stream.resume();
+        });
+    });
+
     var nextID = 1;
     function getID() {
         while (streams.hasOwnProperty(nextID)) { nextID++; }
