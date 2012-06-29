@@ -4,6 +4,7 @@
     "private": true,
 
     "dependencies": {
-        "simple-mime": "~0.0.5"
+        "simple-mime": "~0.0.5",
+        "smith": "~0.1.1"
     }
 }
