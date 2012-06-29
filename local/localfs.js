@@ -7,7 +7,36 @@ var resolve = require('path').resolve;
 var dirname = require('path').dirname;
 var basename = require('path').basename;
 var Stream = require('stream').Stream;
+var EventEmitter = require('events').EventEmitter;
+var inherits = require('util').inherits;
 var getMime = require('simple-mime')("application/octet-stream");
+
+// Writable stream that emits "done" with the buffered contents.
+inherits(MemStream, Stream);
+function MemStream(callback) {
+  this.chunks = [];
+  this.writable = true;
+}
+MemStream.prototype.write = function (chunk) {
+  this.chunks.push(chunk);
+};
+MemStream.prototype.end = function (chunk) {
+  if (arguments.length > 0) {
+    this.chunks.push(chunk);
+  }
+  var data = this.chunks.join("");
+  this.chunks.length = 0;
+  this.emit("done", data);
+};
+
+// node-style eval
+function evaluate(code) {
+  var exports = {};
+  var module = { exports: exports };
+  (new Function("module", "exports", code))(module, exports);
+  return module.exports;
+}
+
 
 // Functions useful for matching users and permissions
 // hopefully the engine inlines these.
@@ -94,6 +123,8 @@ module.exports = function setup(fsOptions) {
     fsGid = process.getgid();
   }
 
+  var apis = {};
+
   return {
     // Process Management
     spawn: spawn,
@@ -116,6 +147,8 @@ module.exports = function setup(fsOptions) {
 
     watch: watch,
     changedSince: changedSince,
+
+    extend: extend, // For extending the API
 
     // for internal use only
     killtree: killtree
@@ -313,6 +346,54 @@ module.exports = function setup(fsOptions) {
         callback(err, stdout, stderr);
       });
     });
+  }
+
+  function extend(name, options, callback) {
+    var meta = {};
+    // Pull from cache if it's already loaded.
+    if (apis.hasOwnProperty(name)) {
+      meta.api = apis[name];
+      return callback(null, meta);
+    }
+
+    var api = apis[name] = meta.api = new EventEmitter()
+    var functions; // Will contain the compiled code as functions
+
+    // Create proxy functions.
+    options.names.forEach(function (name) {
+      api[name] = function () {
+        if (!functions) {
+          return api.emit("error", new Error("Missing API functions"));
+        }
+        if (!functions.hasOwnProperty(name)) {
+          return api.emit("error", new Error("Missing API function: " + name));
+        }
+        return functions[name].apply(this, arguments);
+      };
+    });
+
+    // The user can pass in a path to a file to require
+    if (options.file) {
+      functions = require(options.file);
+    }
+
+    // User can pass in code as a pre-buffered string
+    else if (options.code) {
+      functions = evaluate(options.code);
+    }
+
+    // Or we'll give them a writable stream to pipe it to.
+    else {
+      var chunks = [];
+      var stream = meta.stream = new MemStream();
+      stream.on("done", function (code) {
+        functions = evaluate(code);
+        api.emit("ready");
+      });
+    }
+
+    return callback(null, meta);
+
   }
 
   function killtree(child, signal){
