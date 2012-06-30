@@ -13,7 +13,7 @@ var getMime = require('simple-mime')("application/octet-stream");
 
 // Writable stream that emits "done" with the buffered contents.
 inherits(MemStream, Stream);
-function MemStream(callback) {
+function MemStream() {
   this.chunks = [];
   this.writable = true;
 }
@@ -263,7 +263,7 @@ module.exports = function setup(fsOptions) {
   function spawn(executablePath, options, callback) {
     if (!checkType([
       "executablePath", executablePath, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var args = options.args || [];
@@ -280,8 +280,9 @@ module.exports = function setup(fsOptions) {
       options.env = fsOptions.defaultEnv;
     }
 
+    var child;
     try {
-      var child = childProcess.spawn(executablePath, args, options);
+      child = childProcess.spawn(executablePath, args, options);
     } catch (e) {
       return callback(e);
     }
@@ -306,7 +307,7 @@ module.exports = function setup(fsOptions) {
   function exec(executablePath, options, callback) {
     if (!checkType([
       "executablePath", executablePath, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
     spawn(executablePath, options, function(err, meta) {
       if (err) return callback(err);
@@ -349,6 +350,11 @@ module.exports = function setup(fsOptions) {
   }
 
   function extend(name, options, callback) {
+    if (!checkType([
+      "name", name, "string",
+      "options", options, "object"
+    ], callback)) return;
+
     var meta = {};
     // Pull from cache if it's already loaded.
     if (apis.hasOwnProperty(name)) {
@@ -356,7 +362,9 @@ module.exports = function setup(fsOptions) {
       return callback(null, meta);
     }
 
-    var api = apis[name] = meta.api = new EventEmitter()
+    var api = apis[name] = meta.api = new EventEmitter();
+    api.name = name;
+    api.names = options.names;
     var functions; // Will contain the compiled code as functions
 
     // Create proxy functions.
@@ -384,7 +392,6 @@ module.exports = function setup(fsOptions) {
 
     // Or we'll give them a writable stream to pipe it to.
     else {
-      var chunks = [];
       var stream = meta.stream = new MemStream();
       stream.on("done", function (code) {
         functions = evaluate(code);
@@ -402,7 +409,7 @@ module.exports = function setup(fsOptions) {
 
     childrenOfPid(pid, function(err, pidlist){
       if (err) {
-        console.error(err);
+        console.error(err.stack);
         return;
       }
 
@@ -442,7 +449,7 @@ module.exports = function setup(fsOptions) {
   function connect(port, options, callback) {
     if (!checkType([
       "port", port, "number",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var retries = options.hasOwnProperty('retries') ? options.retries : 5;
@@ -491,7 +498,7 @@ module.exports = function setup(fsOptions) {
   function readfile(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var meta = {};
@@ -568,7 +575,7 @@ module.exports = function setup(fsOptions) {
   function readdir(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var meta = {};
@@ -612,7 +619,6 @@ module.exports = function setup(fsOptions) {
           function getNext() {
             if (index === files.length) return done();
             var file = files[index++];
-            var left = files.length - index;
             var fullpath = join(path, file);
 
             if (stat.access & 1/*EXEC/SEARCH*/) { // Can they enter the directory?
@@ -645,7 +651,7 @@ module.exports = function setup(fsOptions) {
   function stat(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     // Make sure the parent directory is accessable
@@ -723,7 +729,7 @@ module.exports = function setup(fsOptions) {
   function mkfile(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var meta = {};
@@ -778,7 +784,7 @@ module.exports = function setup(fsOptions) {
   function mkdir(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var meta = {};
@@ -820,7 +826,7 @@ module.exports = function setup(fsOptions) {
   function rmdir(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     if (options.recursive) {
@@ -836,7 +842,7 @@ module.exports = function setup(fsOptions) {
   function rmfile(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     remove(path, fs.unlink, callback);
@@ -845,7 +851,7 @@ module.exports = function setup(fsOptions) {
   function rename(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var meta = {};
@@ -877,7 +883,7 @@ module.exports = function setup(fsOptions) {
   function copy(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var meta = {};
@@ -897,7 +903,7 @@ module.exports = function setup(fsOptions) {
   function symlink(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var meta = {};
@@ -921,7 +927,7 @@ module.exports = function setup(fsOptions) {
   function watch(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var meta = {};
@@ -935,7 +941,7 @@ module.exports = function setup(fsOptions) {
   function changedSince(paths, options, callback) {
     if (!checkType([
       "paths", paths, "array",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     if (!options.since) {
