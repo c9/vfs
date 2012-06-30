@@ -1,4 +1,3 @@
-var Stream = require('stream').Stream;
 var inherits = require('util').inherits;
 var Agent = require('smith').Agent;
 
@@ -14,6 +13,7 @@ function Worker(vfs) {
         destroy: destroy,
         kill: kill,
         close: close,
+        call: call,
         ping: ping,
         // Route other calls to the local vfs instance
         spawn: route("spawn"),
@@ -31,12 +31,13 @@ function Worker(vfs) {
         symlink: route("symlink"),
         watch: route("watch"),
         changedSince: route("changedSince"),
+        extend: route("extend")
     });
 
     var streams = {};
     var watchers = {};
     var processes = {};
-    var self = this;
+    var apis = {};
     var remote = this.remoteApi;
 
     // Resume readable streams that we paused when the channel drains
@@ -110,6 +111,16 @@ function Worker(vfs) {
         return token;
     }
 
+    function storeApi(api) {
+        var name = api.name;
+        apis[name] = api;
+        api.on("ready", function () {
+            remote.onReady(name);
+        });
+        var token = { name: name, names: api.names };
+        return token;
+    }
+
     // Remote side writing to our local writable streams
     function write(id, chunk) {
         // They want to write to our real stream
@@ -145,6 +156,12 @@ function Worker(vfs) {
         watcher.close();
     }
 
+    function call(name, fnName, args) {
+        var api = apis[name];
+        if (!api) return;
+        api[fnName].apply(api, args);
+    }
+
     // Can be used for keepalive checks.
     function ping(callback) {
         callback();
@@ -159,7 +176,7 @@ function Worker(vfs) {
                 if (err) {
                     var nerr = {
                         stack: process.pid + ": " + err.stack
-                    }
+                    };
                     if (err.hasOwnProperty("code")) nerr.code = err.code;
                     if (err.hasOwnProperty("message")) nerr.message = err.message;
                     return callback(nerr);
@@ -174,10 +191,13 @@ function Worker(vfs) {
                 if (meta.watcher) {
                     meta.watcher = storeWatcher(meta.watcher);
                 }
+                if (meta.api) {
+                    meta.api = storeApi(meta.api);
+                }
                 // Call the remote callback with the result
                 callback(null, meta);
             });
-        }
+        };
     }
 }
 inherits(Worker, Agent);

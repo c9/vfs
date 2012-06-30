@@ -13,11 +13,13 @@ function Consumer() {
         onEnd: onEnd,
         onClose: onClose,
         onChange: onChange,
+        onReady: onReady
     });
 
     var proxyStreams = {}; // Stream proxies given us by the other side
     var proxyProcesses = {}; // Process proxies given us by the other side
     var proxyWatchers = {}; // Watcher proxies given us by the other side
+    var proxyApis = {};
 
     this.vfs = {
         ping: ping, // Send a simple ping request to the worker
@@ -36,7 +38,8 @@ function Consumer() {
         symlink: route("symlink"),
         watch: route("watch"),
         changedSince: route("changedSince"),
-    }
+        extend: route("extend")
+    };
     var remote = this.remoteApi;
 
     // Forward drain events to all the writable streams.
@@ -99,6 +102,17 @@ function Consumer() {
         return watcher;
     }
 
+    function makeApiProxy(token) {
+        var name = token.name;
+        var api = proxyApis[name] = new EventEmitter();
+        token.names.forEach(function (functionName) {
+            api[functionName] = function () {
+                remote.call(name, functionName, Array.prototype.slice.call(arguments));
+            };
+        });
+        return api;
+    }
+
     function onExit(pid, code, signal) {
         var process = proxyProcesses[pid];
         process.emit("exit", code, signal);
@@ -129,6 +143,12 @@ function Consumer() {
         watcher.emit("change", event, filename);
     }
 
+    function onReady(name) {
+        var api = proxyApis[name];
+        if (!api) return;
+        api.emit("ready");
+    }
+
     // Return fake endpoints in the initial return till we have the real ones.
     function route(name) {
         return function (path, options, callback) {
@@ -143,9 +163,13 @@ function Consumer() {
                 if (meta.watcher) {
                     meta.watcher = makeWatcherProxy(meta.watcher);
                 }
+                if (meta.api) {
+                    meta.api = makeApiProxy(meta.api);
+                }
+
                 return callback(null, meta);
             });
-        }
+        };
     }
     function ping(callback) {
         return remote.ping(callback);
@@ -158,5 +182,5 @@ inherits(Consumer, Agent);
 // Emit the wrapped API, not the raw one
 Consumer.prototype._emitConnect = function () {
     this.emit("connect", this.vfs);
-}
+};
 
