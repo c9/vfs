@@ -933,7 +933,7 @@ module.exports = function setup(fsOptions) {
     var meta = {};
     realpath(path, function (err, path) {
       if (err) return callback(err);
-      meta.watcher = fs.watchFile(path, options, function (currStat, prevStat) {});
+      meta.watcher = fs.watch(path, options, function (event, filename) {});
       callback(null, meta);
     });
   }
