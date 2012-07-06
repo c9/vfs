@@ -6,14 +6,14 @@
     ],
     "name": "vfs-local",
     "description": "A vfs implementation that works on the local filesystem, but with optional security constraints",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "repository": {
         "type": "git",
         "url": "git://github.com/c9/vfs.git"
     },
     "main": "localfs.js",
     "dependencies": {
-        "simple-mime": "0.0.5"
+        "simple-mime": "0.0.6"
     },
     "devDependencies": {},
     "optionalDependencies": {},
