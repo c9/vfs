@@ -37,6 +37,7 @@ function evaluate(code) {
   return module.exports;
 }
 
+
 // Functions useful for matching users and permissions
 // hopefully the engine inlines these.
 function canRead(owner, inGroup, mode) {
@@ -144,7 +145,9 @@ module.exports = function setup(fsOptions) {
     copy: copy,
     symlink: symlink,
 
-    watch: watch,
+    watchFile: watchFile,
+    unwatchFile: unwatchFile,
+    watchDirectory: watchDirectory,
     changedSince: changedSince,
 
     extend: extend, // For extending the API
@@ -306,7 +309,7 @@ module.exports = function setup(fsOptions) {
   function exec(executablePath, options, callback) {
     if (!checkType([
       "executablePath", executablePath, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
     spawn(executablePath, options, function(err, meta) {
       if (err) return callback(err);
@@ -497,7 +500,7 @@ module.exports = function setup(fsOptions) {
   function readfile(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     var meta = {};
@@ -686,6 +689,8 @@ module.exports = function setup(fsOptions) {
         entry.access = stat.access;
         entry.size = stat.size;
         entry.mtime = stat.mtime.valueOf();
+        entry.atime = stat.atime.valueOf();
+        entry.ctime = stat.ctime.valueOf();
 
         if (stat.isDirectory()) {
           entry.mime = "inode/directory";
@@ -825,7 +830,7 @@ module.exports = function setup(fsOptions) {
   function rmdir(path, options, callback) {
     if (!checkType([
       "path", path, "string",
-      "options", options, "object",
+      "options", options, "object"
     ], callback)) return;
 
     if (options.recursive) {
@@ -923,10 +928,26 @@ module.exports = function setup(fsOptions) {
   // Simple wrapper around node's fs.watch function.  Returns a watcher object
   // that emits "change" events.  Make sure to call .close() when done to
   // prevent leaks.
-  function watchFile(path, options, callback) {
+  function watchDirectory(path, options, callback) {
     if (!checkType([
       "path", path, "string",
       "options", options, "object"
+    ], callback)) return;
+
+    var meta = {};
+    realpath(path, function (err, path) {
+      if (err) return callback(err);
+      meta.watcher = fs.watch(path, options, function (event, filename) {});
+      callback(null, meta);
+    });
+  }
+
+  // Simple wrapper around node's fs.watchFile function. Returns a watcher object
+  // that emits "change" events
+  function watchFile(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
     ], callback)) return;
 
     var meta = {};
@@ -937,11 +958,11 @@ module.exports = function setup(fsOptions) {
     });
   }
 
-  function unwatchFile(path) {
+  function unwatchFile(path, callback) {
     realpath(path, function (err, path) {
       if (err) return callback(err);
-      meta.unwatchFile = fs.unwatchFile(path);
-      callback(null, meta);
+      fs.unwatchFile(path);
+      callback(null);
     });
   }
   
