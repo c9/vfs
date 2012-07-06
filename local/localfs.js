@@ -145,7 +145,9 @@ module.exports = function setup(fsOptions) {
     copy: copy,
     symlink: symlink,
 
-    watch: watch,
+    watchFile: watchFile,
+    unwatchFile: unwatchFile,
+    watchDirectory: watchDirectory,
     changedSince: changedSince,
 
     extend: extend, // For extending the API
@@ -687,6 +689,8 @@ module.exports = function setup(fsOptions) {
         entry.access = stat.access;
         entry.size = stat.size;
         entry.mtime = stat.mtime.valueOf();
+        entry.atime = stat.atime.valueOf();
+        entry.ctime = stat.ctime.valueOf();
 
         if (stat.isDirectory()) {
           entry.mime = "inode/directory";
@@ -924,7 +928,7 @@ module.exports = function setup(fsOptions) {
   // Simple wrapper around node's fs.watch function.  Returns a watcher object
   // that emits "change" events.  Make sure to call .close() when done to
   // prevent leaks.
-  function watch(path, options, callback) {
+  function watchDirectory(path, options, callback) {
     if (!checkType([
       "path", path, "string",
       "options", options, "object"
@@ -933,11 +937,35 @@ module.exports = function setup(fsOptions) {
     var meta = {};
     realpath(path, function (err, path) {
       if (err) return callback(err);
-      meta.watcher = fs.watchFile(path, options, function (currStat, prevStat) {});
+      meta.watcher = fs.watch(path, options, function (event, filename) {});
       callback(null, meta);
     });
   }
 
+  // Simple wrapper around node's fs.watchFile function. Returns a watcher object
+  // that emits "change" events
+  function watchFile(path, options, callback) {
+    if (!checkType([
+      "path", path, "string",
+      "options", options, "object",
+    ], callback)) return;
+
+    var meta = {};
+    realpath(path, function (err, path) {
+      if (err) return callback(err);
+      meta.watcher = fs.watchFile(path, options, function (curr, prev) {});
+      callback(null, meta);
+    });
+  }
+
+  function unwatchFile(path, callback) {
+    realpath(path, function (err, path) {
+      if (err) return callback(err);
+      fs.unwatchFile(path);
+      callback(null);
+    });
+  }
+  
   function changedSince(paths, options, callback) {
     if (!checkType([
       "paths", paths, "array",
@@ -984,4 +1012,3 @@ module.exports = function setup(fsOptions) {
   }
 
 };
-
