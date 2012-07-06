@@ -8,13 +8,15 @@ var Parent = require('vfs-child').Parent;
 var parent = new Parent({root: __dirname + "/"});
 parent.connect(function (err, vfs) {
   if (err) throw err;
-  // watch(vfs);
-  changed(vfs);
+  watch(vfs);
+  // changed(vfs);
 });
 
 
 function watch(vfs) {
-  vfs.watch(".", {}, function (err, meta) {
+  // vfs.watch(".", {}, onWatch);
+  vfs.watch("vfs-watch-example.js", {file:true}, onWatch);
+  function onWatch(err, meta) {
     if (err) throw err;
     var watcher = meta.watcher;
     watcher.on("change", function (event, filename) {
@@ -24,7 +26,7 @@ function watch(vfs) {
       console.log("Closing...");
       watcher.close()
     }, 10000);
-  });
+  }
 }
 
 function changed(vfs) {
