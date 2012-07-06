@@ -53,6 +53,11 @@ function Worker(vfs) {
         while (streams.hasOwnProperty(nextID)) { nextID++; }
         return nextID;
     }
+    var nextWatcherID = 1;
+    function getWatcherID() {
+        while (watchers.hasOwnProperty(nextWatcherID)) { nextWatcherID++; }
+        return nextWatcherID;
+    }
 
     function storeStream(stream) {
         var id = getID();
@@ -101,7 +106,7 @@ function Worker(vfs) {
     }
 
     function storeWatcher(watcher) {
-        var id = getID();
+        var id = getWatcherID();
         watchers[id] = watcher;
         watcher.id = id;
         watcher.on("change", function (event, filename) {
