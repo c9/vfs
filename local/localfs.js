@@ -940,7 +940,7 @@ module.exports = function setup(fsOptions) {
         };
       }
       else {
-        meta.watcher = fs.watch(path, options);
+        meta.watcher = fs.watch(path, options, function () {});
       }
       callback(null, meta);
     });
