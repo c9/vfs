@@ -15,6 +15,7 @@ function Parent(fsOptions) {
         options.uid = fsOptions.uid;
         delete fsOptions.uid;
     }
+    options.customFds = [-1, -1, 2];
     var args = [require.resolve('./child.js'), JSON.stringify(fsOptions)];
     var executablePath = process.execPath;
     var child;
@@ -23,7 +24,6 @@ function Parent(fsOptions) {
     this.connect = connect.bind(this);
     function connect(callback) {
         child = spawn(executablePath, args, options);
-        child.stderr.pipe(process.stderr, { end: false });
         child.stdin.readable = true;
         var self = this;
         Consumer.prototype.connect.call(this, [child.stdout, child.stdin], callback);
