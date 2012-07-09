@@ -180,7 +180,7 @@ module.exports = function setup(fsOptions) {
     var list = handlers[name];
     if (list) {
       for (var i = 0, l = list.length; i < l; i++) {
-        list[i].call(this, value);
+        list[i](value);
       }
     }
     callback && callback();
