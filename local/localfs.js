@@ -124,6 +124,7 @@ module.exports = function setup(fsOptions) {
   }
 
   var apis = {};
+  var handlers = {};
 
   return {
     // Process Management
@@ -151,8 +152,39 @@ module.exports = function setup(fsOptions) {
     extend: extend, // For extending the API
 
     // for internal use only
-    killtree: killtree
+    killtree: killtree,
+
+    on: on,
+    off: off,
+    emit: emit
   };
+
+  function on(name, handler, callback) {
+    if (!handlers[name]) handlers[name] = [];
+    handlers[name].push(handler);
+    callback && callback();
+  }
+
+  function off(name, handler, callback) {
+    var list = handlers[name];
+    if (list) {
+      var index = list.indexOf(handler);
+      if (index >= 0) {
+        list.splice(index, 1);
+      }
+    }
+    callback && callback();
+  }
+
+  function emit(name, value, callback) {
+    var list = handlers[name];
+    if (list) {
+      for (var i = 0, l = list.length; i < l; i++) {
+        list[i].call(this, value);
+      }
+    }
+    callback && callback();
+  }
 
   // Give this a stat object (or any object containing uid, gid, and mode) and
   // it will tell you what permissions the current fs instance has as a number.
