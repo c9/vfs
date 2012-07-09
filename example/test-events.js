@@ -1,4 +1,4 @@
-// Test real version
+// // Test real version
 // var vfs = require('vfs-local')({
 //   root: __dirname + "/"
 // });
@@ -19,6 +19,7 @@ function test(vfs) {
       console.log("MONKEY is emitted");
       vfs.off("MONKEY", onMonkey, function () {
         console.log("MONKEY is no longer listening");
+        vfs.emit("MONKEY", "IS NOT LISTENING");
       });
     });
   });
