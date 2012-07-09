@@ -15,6 +15,10 @@ function Worker(vfs) {
         close: close,
         call: call,
         ping: ping,
+        subscribe: subscribe,
+        unsubscribe: unsubscribe,
+        emit: vfs.emit,
+
         // Route other calls to the local vfs instance
         spawn: route("spawn"),
         exec: route("exec"),
@@ -38,7 +42,21 @@ function Worker(vfs) {
     var watchers = {};
     var processes = {};
     var apis = {};
+    var handlers = {};
     var remote = this.remoteApi;
+
+    function subscribe(name, callback) {
+        handlers[name] = function (value) {
+            remote.onEvent(name, value);
+        }
+        vfs.on(name, handlers[name], callback);
+    }
+
+    function unsubscribe(name, callback) {
+        if (!handlers[name]) return;
+        vfs.off(name, handlers[name], callback);
+        delete handlers[name];
+    }
 
     // Resume readable streams that we paused when the channel drains
     this.on("drain", function () {

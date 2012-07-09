@@ -13,13 +13,17 @@ function Consumer() {
         onEnd: onEnd,
         onClose: onClose,
         onChange: onChange,
-        onReady: onReady
+        onReady: onReady,
+        onEvent: onEvent
     });
 
     var proxyStreams = {}; // Stream proxies given us by the other side
     var proxyProcesses = {}; // Process proxies given us by the other side
     var proxyWatchers = {}; // Watcher proxies given us by the other side
     var proxyApis = {};
+    var handlers = {}; // local handlers for remote events
+    var pendingOn = {}; // queue for pending on handlers.
+    var pendingOff = {}; // queue for pending off handlers.
 
     this.vfs = {
         ping: ping, // Send a simple ping request to the worker
@@ -38,7 +42,10 @@ function Consumer() {
         symlink: route("symlink"),
         watch: route("watch"),
         changedSince: route("changedSince"),
-        extend: route("extend")
+        extend: route("extend"),
+        emit: emit,
+        on: on,
+        off: off
     };
     var remote = this.remoteApi;
 
@@ -149,9 +156,62 @@ function Consumer() {
         api.emit("ready");
     }
 
+    // For routing events from remote vfs to local listeners.
+    function onEvent(name, value) {
+        var list = handlers[name];
+        if (!list) return;
+        for (var i = 0, l = list.length; i < l; i++) {
+            list[i](value);
+        }
+    }
+
+    function on(name, handler, callback) {
+        if (handlers[name]) {
+            handlers[name].push(handler);
+            if (pendingOn[name]) {
+                callback && pendingOn[name].push(callback);
+                return;
+            }
+            return callback();
+        }
+        handlers[name] = [handler];
+        var pending = pendingOn[name] = [];
+        callback && pending.push(callback);
+        return remote.subscribe(name, function (err) {
+            for (var i = 0, l = pending.length; i < l; i++) {
+                pending[i](err);
+            }
+            delete pendingOn[name];
+        });
+    }
+
+    function off(name, handler, callback) {
+        if (pendingOff[name]) {
+            callback && pendingOff[name].push(callback);
+            return;
+        }
+        if (!handlers[name]) {
+            return callback();
+        }
+        var pending = pendingOff[name] = [];
+        callback && pending.push(callback);
+        return remote.unsubscribe(name, function (err) {
+            delete handlers[name];
+            for (var i = 0, l = pending.length; i < l; i++) {
+                pending[i](err);
+            }
+            delete pendingOff[name];
+        });
+    }
+
+    function emit() {
+        remote.emit.apply(this, arguments);
+    }
+
     // Return fake endpoints in the initial return till we have the real ones.
     function route(name) {
         return function (path, options, callback) {
+            if (!callback) throw new Error("Forgot to pass in callback for " + name);
             return remote[name].call(this, path, options, function (err, meta) {
                 if (err) return callback(err);
                 if (meta.stream) {
