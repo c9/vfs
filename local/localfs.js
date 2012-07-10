@@ -126,7 +126,7 @@ module.exports = function setup(fsOptions) {
   var apis = {};
   var handlers = {};
 
-  return {
+  var vfs = {
     // Process Management
     spawn: spawn,
     exec: exec,
@@ -158,6 +158,8 @@ module.exports = function setup(fsOptions) {
     off: off,
     emit: emit
   };
+
+  return vfs;
 
   function on(name, handler, callback) {
     if (!handlers[name]) handlers[name] = [];
@@ -414,24 +416,32 @@ module.exports = function setup(fsOptions) {
 
     // The user can pass in a path to a file to require
     if (options.file) {
-      functions = require(options.file);
+      require(options.file)(vfs, onEvaluate);
     }
 
     // User can pass in code as a pre-buffered string
     else if (options.code) {
-      functions = evaluate(options.code);
+      evaluate(options.code)(vfs, onEvaluate);
     }
 
     // Or we'll give them a writable stream to pipe it to.
     else {
       var stream = meta.stream = new MemStream();
       stream.on("done", function (code) {
-        functions = evaluate(code);
-        api.emit("ready");
+        evaluate(code)(vfs, onEvaluate);
       });
     }
 
     return callback(null, meta);
+
+    function onEvaluate(err, exports) {
+      if (err) {
+        api.emit("error", err);
+        return;
+      }
+      functions = exports;
+      api.emit("ready");
+    }
 
   }
 
