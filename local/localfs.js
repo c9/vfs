@@ -442,7 +442,7 @@ module.exports = function setup(fsOptions) {
       var stream = meta.stream = new MemStream();
       stream.on("done", function (code) {
         try {
-          functions = evaluate(code)(vfs, onEvaluate);
+          evaluate(code)(vfs, onEvaluate);
         } catch(err) {
           console.error(err.stack);
           api.emit("error", err);
