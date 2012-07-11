@@ -10,6 +10,7 @@ var Stream = require('stream').Stream;
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var getMime = require('simple-mime')("application/octet-stream");
+var vm = require('vm');
 
 // Writable stream that emits "done" with the buffered contents.
 inherits(MemStream, Stream);
@@ -33,7 +34,19 @@ MemStream.prototype.end = function (chunk) {
 function evaluate(code) {
   var exports = {};
   var module = { exports: exports };
-  (new Function("module", "exports", code))(module, exports);
+  vm.runInNewContext(code, {
+    require: require,
+    exports: exports,
+    module: module,
+    console: console,
+    global: global,
+    process: process,
+    Buffer: Buffer,
+    setTimeout: setTimeout,
+    clearTimeout: clearTimeout,
+    setInterval: setInterval,
+    clearInterval: clearInterval
+  }, "dynamic-" + Date.now(), true);
   return module.exports;
 }
 
@@ -428,7 +441,14 @@ module.exports = function setup(fsOptions) {
     else {
       var stream = meta.stream = new MemStream();
       stream.on("done", function (code) {
-        evaluate(code)(vfs, onEvaluate);
+        try {
+          functions = evaluate(code)(vfs, onEvaluate);
+        } catch(err) {
+          console.error(err.stack);
+          api.emit("error", err);
+          return;
+        }
+        api.emit("ready");
       });
     }
 
