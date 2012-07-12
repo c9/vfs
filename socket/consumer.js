@@ -1,8 +1,10 @@
 var Stream = require('stream').Stream;
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
-var Agent = require('smith').Agent;
+var smith = require('smith');
+var Agent = smith.Agent;
 
+exports.smith = smith;
 exports.Consumer = Consumer;
 
 function Consumer() {
