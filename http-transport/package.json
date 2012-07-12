@@ -1,0 +1,9 @@
+{
+  "name": "vfs-http-transport",
+  "version": "0.0.1",
+  "author": "Tim Caswell",
+  "dependencies": {
+  	"vfs-socket": "~0.1.7",
+  	"ws": "~0.4.20"
+  }
+}
