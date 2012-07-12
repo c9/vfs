@@ -13,7 +13,8 @@ module.exports = function setup(mount, vfs) {
     input.on("data", function (entry) {
       if (path) {
         entry.href = path + entry.name;
-        if (entry.mime.match(/(directory|folder)$/)) {
+        var mime = entry.linkStat ? entry.linkStat.mime : entry.mime;
+        if (mime.match(/(directory|folder)$/)) {
           entry.href += "/";
         }
       }
