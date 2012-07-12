@@ -76,5 +76,16 @@ function startClient() {
         if (err) throw err;
         routes.push(httpAdapter("/http/", vfs));
         console.log("http vfs at http://localhost:8080/http/");
+
+        vfs.extend("math", {names: ["add", "multiply"], file: __dirname + "/extension.js"}, function (err, meta) {
+            if (err) throw err;
+            console.log("extend", meta);
+            meta.api.add(3, 5, function (err, result) {
+                if (err) throw err;
+                console.log("extend add(3, 5)", result);
+            });
+        });
+
+
     });
 }
