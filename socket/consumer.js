@@ -114,6 +114,8 @@ function Consumer() {
     function makeApiProxy(token) {
         var name = token.name;
         var api = proxyApis[name] = new EventEmitter();
+        api.name = token.name;
+        api.names = token.names;
         token.names.forEach(function (functionName) {
             api[functionName] = function () {
                 remote.call(name, functionName, Array.prototype.slice.call(arguments));
