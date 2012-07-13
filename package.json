@@ -1,11 +1,13 @@
 {
-    "name": "vfs",
-    "version": "0.0.2",
-    "private": true,
-
-    "dependencies": {
-        "simple-mime": "~0.0.5",
-        "smith": "~0.1.1",
-        "ws": "~0.4.20"
-    }
+  "name": "vfs",
+  "version": "0.0.2",
+  "private": true,
+  "dependencies": {
+    "simple-mime": "~0.0.5",
+    "smith": "~0.1.1",
+    "ws": "~0.4.20"
+  },
+  "devDependencies": {
+    "stack": "~0.1.0"
+  }
 }
