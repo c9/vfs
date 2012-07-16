@@ -415,24 +415,6 @@ module.exports = function setup(fsOptions) {
       return callback(null, meta);
     }
 
-    var api = apis[name] = meta.api = new EventEmitter();
-    api.name = name;
-    api.names = options.names;
-    var functions; // Will contain the compiled code as functions
-
-    // Create proxy functions.
-    options.names.forEach(function (name) {
-      api[name] = function () {
-        if (!functions) {
-          return api.emit("error", new Error("Missing API functions"));
-        }
-        if (!functions.hasOwnProperty(name)) {
-          return api.emit("error", new Error("Missing API function: " + name));
-        }
-        return functions[name].apply(this, arguments);
-      };
-    });
-
     // The user can pass in a path to a file to require
     if (options.file) {
       var fn;
@@ -455,35 +437,34 @@ module.exports = function setup(fsOptions) {
       fn(vfs, onEvaluate);
     }
 
-    // Or we'll give them a writable stream to pipe it to.
-    else {
-      var stream = meta.stream = new MemStream();
+    // Or they can provide a readable stream
+    else if (options.stream) {
+      var stream = new MemStream();
+      options.stream.pipe(stream);
       stream.on("done", function (code) {
         var fn;
         try {
           fn = evaluate(code);
         } catch(err) {
-          console.error(err.stack);
-          api.emit("error", err);
-          return;
+          return callback(err);
         }
         fn(vfs, onEvaluate);
       });
     }
 
-    return callback(null, meta);
+    else {
+      return callback(new Error("must provide `file`, `code`, or `stream` when cache is empty for " + name));
+    }
 
     function onEvaluate(err, exports) {
       if (err) {
-        api.emit("error", err);
-        return;
+        return callback(err);
       }
-      functions = exports;
-      try {
-        api.emit("ready");
-      } catch (err) {
-        api.emit("error", err);
-      }
+      exports.names = Object.keys(exports);
+      exports.name = name;
+      apis[name] = exports;
+      meta.api = exports;
+      callback(null, meta);
     }
 
   }
