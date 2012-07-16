@@ -158,6 +158,12 @@ module.exports = function setup(fsOptions) {
     rename: rename,
     copy: copy,
     symlink: symlink,
+    realpath: function (path, options, callback) {
+      realpath(path, function (err, path) {
+        if (err) return callback(err);
+        callback(null, { path: path });
+      }, options.alreadyRooted);
+    },
 
     watch: watch,
     changedSince: changedSince,
