@@ -1,0 +1,25 @@
+{
+    "author": "Ajax.org B.V. <info@ajax.org>",
+    "contributors": [
+        { "name": "Tim Caswell", "email": "tim@c9.io>" }
+    ],
+    "name": "vfs-composite",
+    "description": "A meta vfs that composes other vfs instances.",
+    "version": "0.0.1",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/c9/vfs.git"
+    },
+    "main": "composite.js",
+    "dependencies": {
+    },
+    "devDependencies": {},
+    "optionalDependencies": {},
+    "licenses" : [{
+        "type" : "MIT",
+        "url" : "http://github.com/c9/vfs/raw/master/local/LICENSE"
+    }],
+    "engines": {
+        "node": "*"
+    }
+}
