@@ -36,6 +36,7 @@ function Worker(vfs) {
         rename: route("rename"),
         copy: route("copy"),
         symlink: route("symlink"),
+        realpath: route("realpath"),
         watch: route("watch"),
         changedSince: route("changedSince"),
         extend: route("extend")
