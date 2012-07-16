@@ -19,7 +19,7 @@ child.connect(function (err, vfs) {
 
     // Extend the API
     var options = {
-        names: ["add", "multiply"]
+        stream: fs.createReadStream(__dirname + "/extension.js")
     };
 
     console.log(process.pid, "Calling extend");
@@ -28,16 +28,11 @@ child.connect(function (err, vfs) {
     // Test the extension
     function onExtend(err, meta) {
         if (err) throw err;
-                file:
-        console.log("Sending code to child for extension");
-        fs.createReadStream(__dirname + "/extension.js").pipe(meta.stream);
         var math = meta.api;
-        math.on("ready", function () {
-            console.log("Calling add(3, 5, callback)");
-            math.add(3, 5, function (err, result) {
-                if (err) throw err;
-                console.log("3 + 5 = %s", result);
-            });
+        console.log("Calling add(3, 5, callback)");
+        math.add(3, 5, function (err, result) {
+            if (err) throw err;
+            console.log("3 + 5 = %s", result);
         });
     }
 

@@ -77,7 +77,7 @@ function startClient() {
         routes.push(httpAdapter("/http/", vfs));
         console.log("http vfs at http://localhost:8080/http/");
 
-        vfs.extend("math", {names: ["add", "multiply"], file: __dirname + "/extension.js"}, function (err, meta) {
+        vfs.extend("math", {file: __dirname + "/extension.js"}, function (err, meta) {
             if (err) throw err;
             console.log("extend", meta);
             meta.api.add(3, 5, function (err, result) {
@@ -86,13 +86,20 @@ function startClient() {
             });
         });
 
-        vfs.extend("math2", {names: ["add", "multiply"]}, function (err, meta) {
+        vfs.extend("math2", {stream: require('fs').createReadStream(__dirname + "/extension.js")}, function (err, meta) {
             if (err) throw err;
-            require('fs').createReadStream(__dirname + "/extension.js").pipe(meta.stream);
-            meta.api.on("ready", function () {
-                meta.api.add(13, 5, function (err, result) {
+            
+            meta.api.add(13, 5, function (err, result) {
+                if (err) throw err;
+                console.log("extend add(13, 5)", result);
+
+
+                vfs.extend("math3", {stream: require('fs').createReadStream(__dirname + "/extension.js")}, function (err, meta) {
                     if (err) throw err;
-                    console.log("extend add(13, 5)", result);
+                    meta.api.add(13, 15, function (err, result) {
+                        if (err) throw err;
+                        console.log("extend add(13, 15)", result);
+                    });
                 });
 
             });
