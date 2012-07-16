@@ -12,11 +12,6 @@ vfs.mount({ root: "/", vfs: vfsLocal, prefix: "/Desktop/" });
 
 console.log(vfs);
 
-// vfs.stat("/home/tim/teflon.zip", {}, function (err, stat) {
-// 	if (err) throw err;
-// 	console.log(stat);
-// });
-
 require('http').createServer(require('stack')(
 	require('vfs-http-adapter')("/", vfs)
 )).listen(8080, function () {
