@@ -1,6 +1,7 @@
 var inherits = require('util').inherits;
 var smith = require('smith');
 var Agent = smith.Agent;
+var Stream = require('stream').Stream;
 
 exports.smith = smith;
 
@@ -10,17 +11,37 @@ exports.Worker = Worker;
 // tandem with Consumer agents on the other side.
 function Worker(vfs) {
     Agent.call(this, {
-        // And stream endpoints for writable streams to receive their data
+
+        // Endpoints for writable streams at meta.stream (and meta.process.stdin)
         write: write,
         end: end,
+
+        // Endpoint for readable stream at meta.stream (and meta.process.{stdout,stderr})
         destroy: destroy,
+
+        // Endpoints for readable streams at options.stream
+        onData: onData,
+        onEnd: onEnd,
+
+        // Endpoint for writable streams at options.stream
+        onClose: onClose,
+
+        // Endpoints for processes at meta.process
         kill: kill,
+
+        // Endpoint for watchers at meta.watcher
         close: close,
+
+        // Endpoint for apis at meta.api
         call: call,
-        ping: ping,
+
+        // Endpoints for vfs itself
         subscribe: subscribe,
         unsubscribe: unsubscribe,
         emit: vfs.emit,
+
+        // special vfs-socket api
+        ping: ping,
 
         // Route other calls to the local vfs instance
         spawn: route("spawn"),
@@ -42,6 +63,7 @@ function Worker(vfs) {
         extend: route("extend")
     });
 
+    var proxyStreams = {};
     var streams = {};
     var watchers = {};
     var processes = {};
@@ -63,26 +85,48 @@ function Worker(vfs) {
     }
 
     // Resume readable streams that we paused when the channel drains
+    // Forward drain events to all the writable proxy streams.
     this.on("drain", function () {
         Object.keys(streams).forEach(function (id) {
             var stream = streams[id];
             if (stream.readable && stream.resume) stream.resume();
         });
+        Object.keys(proxyStreams).forEach(function (id) {
+            var stream = proxyStreams[id];
+            if (stream.writable) stream.emit("drain");
+        });
     });
 
-    var nextID = 1;
-    function getID() {
-        while (streams.hasOwnProperty(nextID)) { nextID++; }
-        return nextID;
-    }
-    var nextWatcherID = 1;
-    function getWatcherID() {
-        while (watchers.hasOwnProperty(nextWatcherID)) { nextWatcherID++; }
-        return nextWatcherID;
+    function makeStreamProxy(token) {
+        var stream = new Stream();
+        var id = token.id;
+        stream.id = id;
+        proxyStreams[id] = stream;
+        if (token.hasOwnProperty("readable")) stream.readable = token.readable;
+        if (token.hasOwnProperty("writable")) stream.writable = token.writable;
+
+        if (stream.writable) {
+            stream.write = function (chunk) {
+                return remote.write(id, chunk);
+            };
+            stream.end = function (chunk) {
+                if (chunk) remote.end(id, chunk);
+                else remote.end(id);
+            };
+        }
+        if (stream.readable) {
+            stream.destroy = function () {
+                remote.destroy(id);
+            };
+        }
+
+        return stream;
     }
 
+    var nextStreamID = 1;
     function storeStream(stream) {
-        var id = getID();
+        while (streams.hasOwnProperty(nextStreamID)) { nextStreamID++; }
+        var id = nextStreamID;
         streams[id] = stream;
         stream.id = id;
         if (stream.readable) {
@@ -127,8 +171,10 @@ function Worker(vfs) {
         return token;
     }
 
+    var nextWatcherID = 1;
     function storeWatcher(watcher) {
-        var id = getWatcherID();
+        while (watchers.hasOwnProperty(nextWatcherID)) { nextWatcherID++; }
+        var id = nextWatcherID;
         watchers[id] = watcher;
         watcher.id = id;
         watcher.on("change", function (event, filename) {
@@ -141,9 +187,6 @@ function Worker(vfs) {
     function storeApi(api) {
         var name = api.name;
         apis[name] = api;
-        api.on("ready", function () {
-            remote.onReady(name);
-        });
         var token = { name: name, names: api.names };
         return token;
     }
@@ -189,6 +232,22 @@ function Worker(vfs) {
         api[fnName].apply(api, args);
     }
 
+    function onData(id, chunk) {
+        var stream = proxyStreams[id];
+        stream.emit("data", chunk);
+    }
+    function onEnd(id) {
+        var stream = proxyStreams[id];
+        stream.emit("end");
+        delete proxyStreams[id];
+    }
+    function onClose(id) {
+        var stream = proxyStreams[id];
+        if (!stream) return;
+        stream.emit("close");
+        delete proxyStreams[id];
+    }
+
     // Can be used for keepalive checks.
     function ping(callback) {
         callback();
@@ -198,6 +257,9 @@ function Worker(vfs) {
         var fn = vfs[name];
         return function wrapped(path, options, callback) {
             // Call the real local function, but intercept the callback
+            if (options.stream) {
+                options.stream = makeStreamProxy(options.stream);
+            }
             fn(path, options, function (err, meta) {
                 // Make error objects serializable
                 if (err) {

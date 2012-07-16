@@ -10,15 +10,32 @@ exports.Consumer = Consumer;
 function Consumer() {
 
     Agent.call(this, {
-        onExit: onExit,
+
+        // Endpoints for readable streams in meta.stream (and meta.process.{stdout,stderr})
         onData: onData,
         onEnd: onEnd,
+
+        // Endpoint for writable stream at meta.stream (and meta.process.stdin)
         onClose: onClose,
+
+        // Endpoints for writable streams at options.stream
+        write: write,
+        end: end,
+
+        // Endpoint for readable streams at options.stream
+        destroy: destroy,
+
+        // Endpoint for processes in meta.process
+        onExit: onExit,
+
+        // Endpoint for watchers in meta.watcher
         onChange: onChange,
-        onReady: onReady,
+
+        // Endpoint for the remote vfs itself
         onEvent: onEvent
     });
 
+    var streams = {}; // streams sent in options.stream
     var proxyStreams = {}; // Stream proxies given us by the other side
     var proxyProcesses = {}; // Process proxies given us by the other side
     var proxyWatchers = {}; // Watcher proxies given us by the other side
@@ -52,13 +69,50 @@ function Consumer() {
     };
     var remote = this.remoteApi;
 
-    // Forward drain events to all the writable streams.
+    // Resume readable streams that we paused when the channel drains
+    // Forward drain events to all the writable proxy streams.
     this.on("drain", function () {
+        Object.keys(streams).forEach(function (id) {
+            var stream = streams[id];
+            if (stream.readable && stream.resume) stream.resume();
+        });
         Object.keys(proxyStreams).forEach(function (id) {
             var stream = proxyStreams[id];
             if (stream.writable) stream.emit("drain");
         });
     });
+
+    var nextStreamID = 1;
+    function storeStream(stream) {
+        while (streams.hasOwnProperty(nextStreamID)) { nextStreamID++; }
+        var id = nextStreamID;
+        streams[id] = stream;
+        stream.id = id;
+        if (stream.readable) {
+            stream.on("data", function (chunk) {
+                if (remote.onData(id, chunk) === false) {
+                    stream.pause();
+                }
+            });
+            stream.on("end", function () {
+                remote.onEnd(id);
+                delete streams[id];
+                nextID = id;
+            });
+        }
+        if (stream.writable) {
+            stream.on("close", function () {
+                remote.onClose(id);
+                delete streams[id];
+                nextID = id;
+            });
+        }
+        var token = {id: id};
+        if (stream.hasOwnProperty("readable")) token.readable = stream.readable;
+        if (stream.hasOwnProperty("writable")) token.writable = stream.writable;
+        return token;
+    }
+
 
     // options.id, options.readable, options.writable
     function makeStreamProxy(token) {
@@ -155,12 +209,6 @@ function Consumer() {
         watcher.emit("change", event, filename);
     }
 
-    function onReady(name) {
-        var api = proxyApis[name];
-        if (!api) return;
-        api.emit("ready");
-    }
-
     // For routing events from remote vfs to local listeners.
     function onEvent(name, value) {
         var list = handlers[name];
@@ -169,6 +217,40 @@ function Consumer() {
             list[i](value);
         }
     }
+
+    function write(id, chunk) {
+        // They want to write to our real stream
+        var stream = streams[id];
+        stream.write(chunk);
+    }
+    function destroy(id) {
+        var stream = streams[id];
+        if (!stream) return;
+        stream.destroy();
+        delete streams[id];
+        nextID = id;
+    }
+    function pause(id) {
+        var stream = streams[id];
+        if (!stream) return;
+        stream.pause();
+    }
+    function resume(id) {
+        var stream = streams[id];
+        if (!stream) return;
+        stream.resume();
+    }
+    function end(id, chunk) {
+        var stream = streams[id];
+        if (!stream) return;
+        if (chunk)
+            stream.end(chunk);
+        else
+            stream.end();
+        delete streams[id];
+        nextID = id;
+    }
+
 
     function on(name, handler, callback) {
         if (handlers[name]) {
@@ -217,6 +299,9 @@ function Consumer() {
     function route(name) {
         return function (path, options, callback) {
             if (!callback) throw new Error("Forgot to pass in callback for " + name);
+            if (options.stream) {
+                options.stream = storeStream(options.stream);
+            }
             return remote[name].call(this, path, options, function (err, meta) {
                 if (err) return callback(err);
                 if (meta.stream) {
