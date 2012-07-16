@@ -11,6 +11,7 @@ module.exports = function () {
         mounts: mounts,
         readdir: route("readdir"),
         stat: route("stat"),
+        realpath: route("realpath"),
         mkdir: route("mkdir", true),
         rmfile: route("rmfile", true),
         mkdir: route("mkdir", true),
