@@ -435,26 +435,39 @@ module.exports = function setup(fsOptions) {
 
     // The user can pass in a path to a file to require
     if (options.file) {
-      require(options.file)(vfs, onEvaluate);
+      var fn;
+      try {
+        fn = require(options.file);
+      } catch (err) {
+        return callback(err);
+      }
+      fn(vfs, onEvaluate);
     }
 
     // User can pass in code as a pre-buffered string
     else if (options.code) {
-      evaluate(options.code)(vfs, onEvaluate);
+      var fn;
+      try {
+        fn = evaluate(options.code);
+      } catch (err) {
+        return callback(err);
+      }
+      fn(vfs, onEvaluate);
     }
 
     // Or we'll give them a writable stream to pipe it to.
     else {
       var stream = meta.stream = new MemStream();
       stream.on("done", function (code) {
+        var fn;
         try {
-          evaluate(code)(vfs, onEvaluate);
+          fn = evaluate(code);
         } catch(err) {
           console.error(err.stack);
           api.emit("error", err);
           return;
         }
-        api.emit("ready");
+        fn(vfs, onEvaluate);
       });
     }
 
@@ -466,7 +479,11 @@ module.exports = function setup(fsOptions) {
         return;
       }
       functions = exports;
-      api.emit("ready");
+      try {
+        api.emit("ready");
+      } catch (err) {
+        api.emit("error", err);
+      }
     }
 
   }
