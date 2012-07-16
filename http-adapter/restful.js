@@ -191,7 +191,7 @@ module.exports = function setup(mount, vfs) {
       if (path[path.length - 1] === "/") {
         command = vfs.rmdir;
       } else {
-        command = vfs.unlink;
+        command = vfs.rmfile;
       }
       command(path, {}, function (err, meta) {
         if (err) return abort(err);
