@@ -410,7 +410,7 @@ module.exports = function setup(fsOptions) {
 
     var meta = {};
     // Pull from cache if it's already loaded.
-    if (apis.hasOwnProperty(name)) {
+    if (!options.skipCache && apis.hasOwnProperty(name)) {
       meta.api = apis[name];
       return callback(null, meta);
     }
