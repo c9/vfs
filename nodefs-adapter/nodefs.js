@@ -56,27 +56,15 @@ module.exports = function(vfs, base) {
         if (encoding)
             options.encoding = encoding;
 
+        var stream = options.stream = new Stream();
+
         vfs.mkfile(resolvePath(path), options, function(err, meta) {
             if (err)
                 return callback(err);
-
-            var stream = meta.stream;
-            stream.write(data);
-            stream.end();
-
-            var called;
-            stream.on("error", function(err) {
-                if (called) return;
-                called = true;
-                callback(err);
-            });
-
-            stream.on("close", function() {
-                if (called) return;
-                called = true;
-                callback();
-            });
         });
+
+        stream.emit("data", data);
+        stream.emit("end");
     }
 
     function readdir(path, callback) {
