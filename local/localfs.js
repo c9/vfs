@@ -791,60 +791,121 @@ module.exports = function setup(fsOptions) {
   }
 
   // This is used for creating / overwriting files.  It always creates a new tmp
-  // file and then renamed to the final destination.
+  // file and then renames to the final destination.
+  // It will copy the properties of the existing file is there is one.
   function mkfile(path, options, callback) {
     if (!checkType([
       "path", path, "string",
       "options", options, "object"
     ], callback)) return;
+    if (!(options.stream && options.stream.readable)) {
+      return callback(new TypeError("Must provide a readable stream as 'stream' option."));
+    }
+
+    // Pause the input for now since we're not ready to write quite yet
+    var readable = options.stream;
+    if (readable.pause) readable.pause();
+    var buffer = [];
+    readable.on("data", onData);
+    function onData(chunk) {
+      buffer.push(["data", chunk]);
+    }
+    function onEnd() {
+      buffer.push(["end"]);
+    }
+    function error(err) {
+      readable.removeListener("data", onData);
+      readable.removeListener("end", onEnd);
+      if (readable.destroy) readable.destroy();
+      if (err) callback(err);
+    }
 
     var meta = {};
+    var tmpPath;
 
     // Make sure the user has access to the directory and get the real path.
     realpath(dirname(path), function (err, dir) {
-      if (err) return callback(err);
+      if (err) return error(err);
       path = join(dir, basename(path));
+
       // Use a temp file for both atomic saves and to ensure we never write to
       // existing files.  Writing to an existing symlink would bypass the
       // security restrictions.
-      var tmpPath = path + "." + (Date.now() + Math.random() * 0x100000000).toString(36) + ".tmp";
+      tmpPath = path + "." + Date.now().toString(36) + "-" + (Math.random() * 0x100000000).toString(36) + ".tmp";
+
+      // Set default uid/gid/mode for new files
+      var mode = umask & 0666;
+      var uid, gid;
+      if (checkPermissions) {
+        uid = fsUid;
+        gid = fdGid;
+      }
+
       // node 0.8.x adds a "wx" shortcut, but since it's not in 0.6.x we use the
       // longhand here.
       var flags = constants.O_CREAT | constants.O_WRONLY | constants.O_EXCL;
-      fs.open(tmpPath, flags, umask & 0666, function (err, fd) {
-        if (err) return callback(err);
-        options.fd = fd;
-        if (checkPermissions) {
-          // Set the new file to the specified user
-          fs.fchown(fd, fsUid, fsGid, function (err) {
-            if (err) {
-              fs.close(fd);
-              return callback(err);
-            }
-            onCreate();
-          });
-        } else {
-          onCreate();
+
+      // Check if the file exists.  If so, make sure it's writable and get it's stat.
+      statSafe(path, 4, function (err, stat) {
+        if (err && err.code !== "ENOENT") return error(err);
+        if (stat) {
+          mode = stat.mode & 0777;
+          uid = stat.uid;
+          gid = stat.gid;
         }
-        function onCreate() {
-          var stream = new fs.WriteStream(path, options);
-          var hadError;
-          stream.once('error', function () {
-            hadError = true;
-          });
-          stream.on('close', function () {
-            if (hadError) return;
-            fs.rename(tmpPath, path, function (err) {
-              if (err) return stream.emit("error", err);
-              stream.emit("saved");
+
+        // Create the temp file.
+        fs.open(tmpPath, flags, mode, function (err, fd) {
+          if (err) return error(err);
+          options.fd = fd;
+          // Set a uid/gid if requested
+          if (uid !== undefined || gid !== undefined) {
+            fs.fchown(fd, uid, gid, function (err) {
+              if (err) {
+                fs.close(fd);
+                return error(err);
+              }
+              onCreate();
             });
-          });
-          meta.stream = stream;
-          meta.tmpPath = tmpPath;
-          callback(null, meta);
-        }
+          }
+          // Or skip to streaming
+          else {
+            onCreate();
+          }
+        });
+
       });
+
     });
+
+
+    function onCreate() {
+      var stream = new fs.WriteStream(path, options);
+      readable.pipe(stream);
+      // Stop buffering events and playback anything that happened.
+      readable.removeListener("data", onData);
+      readable.removeListener("end", onEnd);
+      buffer.forEach(function (event) {
+        readable.emit.apply(readable, event);
+      });
+      // Resume the input stream if possible
+      if (readable.resume) readable.resume();
+
+      var hadError;
+      stream.once('error', function (err) {
+        hadError = true;
+        error(err);
+      });
+      stream.on('close', function () {
+        if (hadError) return;
+        fs.rename(tmpPath, path, function (err) {
+          if (err) return error(err);
+          callback(null, meta);
+          stream.emit("saved");
+        });
+      });
+    }
+
   }
 
   function mkdir(path, options, callback) {
@@ -953,15 +1014,11 @@ module.exports = function setup(fsOptions) {
     ], callback)) return;
 
     var meta = {};
-    mkfile(path, {}, function (err, writeMeta) {
+    readfile(options.from, {}, function (err, readMeta) {
       if (err) return callback(err);
-      readfile(options.from, {}, function (err, readMeta) {
+      mkfile(path, { stream: readMeta.stream }, function (err, writeMeta) {
         if (err) return callback(err);
-        readMeta.stream.pipe(writeMeta.stream);
-        writeMeta.stream.on("error", callback);
-        writeMeta.stream.on("saved", function () {
-          callback(null, meta);
-        });
+        callback(null, meta);
       });
     });
   }
