@@ -48,31 +48,8 @@ function PartStream(input, headers) {
     this.events = [];
 }
 
-PartStream.prototype.bufferingEmit = function (name) {
-    if (name === "data" || name === "end") {
-        this.events.push(arguments);
-    } else {
-        return Stream.prototype.emit.apply(this, arguments);
-    }
-};
-
-PartStream.prototype.buffer = function buffer() {
-    this.pause();
-    this.emit = this.bufferingEmit;
-};
-
 PartStream.prototype.pause = function pause() {
     this.input.pause();
-};
-
-PartStream.prototype.flush = function flush() {
-    this.emit = Stream.prototype.emit;
-    var copy = this.events;
-    this.events = [];
-    for (var i = 0, l = copy.length; i < l; i++) {
-        Stream.prototype.emit.apply(this, copy[i]);
-    }
-    this.resume();
 };
 
 PartStream.prototype.resume = function resume() {
@@ -303,7 +280,6 @@ Parser.prototype.onData = function onData(chunk) {
 
     // If we were parsing a body, just emit what we got.
     if (this.state === PART_DATA) {
-        var bite;
         if (!partStart) { // The entire chunk was data
             stream.emit("data", chunk);
         } else if (partStart < chunk.length) { // The data started within this chunk

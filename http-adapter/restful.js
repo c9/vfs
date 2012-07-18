@@ -150,38 +150,9 @@ module.exports = function setup(mount, vfs) {
         });
       } else {
 
-        // Pause the stream and record any events
-        var events = [];
-        function onData(chunk) {
-          events.push(["data", chunk]);
-        }
-        function onEnd() {
-          events.push(["end"]);
-        }
-        req.pause();
-        req.on("data", onData);
-        req.on("end", onEnd);
-
-        vfs.mkfile(path, {}, function (err, meta) {
+        vfs.mkfile(path, { stream: req }, function (err, meta) {
           if (err) return abort(err);
-          if (meta.stream) {
-            meta.stream.on("error", abort);
-            req.pipe(meta.stream);
-
-            // Resume the stream and emit any missing events
-            req.removeListener("data", onData);
-            req.removeListener("end", onEnd);
-            for (var i = 0, l = events.length; i < l; i++) {
-              req.emit.apply(req, events[i]);
-            }
-            req.resume();
-
-            meta.stream.on("saved", function () {
-              res.end();
-            });
-          } else {
-            res.end();
-          }
+          res.end();
         });
       }
     } // end PUT request
@@ -228,14 +199,8 @@ module.exports = function setup(mount, vfs) {
           }
           var filename = match[1];
 
-          stream.buffer();
-          vfs.mkfile(path + "/" + filename, {}, function (err, meta) {
+          vfs.mkfile(path + "/" + filename, {stream:stream}, function (err, meta) {
             if (err) return abort(err);
-            if (meta.stream) {
-              meta.stream.on("error", abort);
-              stream.pipe(meta.stream);
-              stream.flush();
-            }
           });
         });
         parser.on("error", abort);
