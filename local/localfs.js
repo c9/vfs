@@ -807,6 +807,7 @@ module.exports = function setup(fsOptions) {
     if (readable.pause) readable.pause();
     var buffer = [];
     readable.on("data", onData);
+    readable.on("end", onEnd);
     function onData(chunk) {
       buffer.push(["data", chunk]);
     }
@@ -882,14 +883,6 @@ module.exports = function setup(fsOptions) {
     function onCreate() {
       var stream = new fs.WriteStream(path, options);
       readable.pipe(stream);
-      // Stop buffering events and playback anything that happened.
-      readable.removeListener("data", onData);
-      readable.removeListener("end", onEnd);
-      buffer.forEach(function (event) {
-        readable.emit.apply(readable, event);
-      });
-      // Resume the input stream if possible
-      if (readable.resume) readable.resume();
 
       var hadError;
       stream.once('error', function (err) {
@@ -901,9 +894,19 @@ module.exports = function setup(fsOptions) {
         fs.rename(tmpPath, path, function (err) {
           if (err) return error(err);
           callback(null, meta);
-          stream.emit("saved");
         });
       });
+
+      // Stop buffering events and playback anything that happened.
+      readable.removeListener("data", onData);
+      readable.removeListener("end", onEnd);
+      buffer.forEach(function (event) {
+        readable.emit.apply(readable, event);
+      });
+      // Resume the input stream if possible
+      if (readable.resume) readable.resume();
+
+
     }
 
   }
