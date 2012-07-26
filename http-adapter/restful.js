@@ -3,7 +3,7 @@ var multipart = require('./multipart');
 var Stream = require('stream').Stream;
 var pathJoin = require('path').join;
 
-module.exports = function setup(mount, vfs) {
+module.exports = function setup(mount, vfs, mountOptions) {
 
   // Returns a json stream that wraps input object stream
   function jsonEncoder(input, path) {
@@ -45,6 +45,7 @@ module.exports = function setup(mount, vfs) {
 
   return function (req, res, next) {
 
+    if (mountOptions.readOnly && !(req.method === "GET" || req.method === "HEAD")) return next();
     if (!req.uri) { req.uri = urlParse(req.url); }
 
     if (mount[mount.length - 1] !== "/") mount += "/";
@@ -93,16 +94,31 @@ module.exports = function setup(mount, vfs) {
         if (req.headers.hasOwnProperty('if-range')) range.etag = req.headers["if-range"];
       }
 
+      var tryAgain;
+
       if (path[path.length - 1] === "/") {
-        options.encoding = null; // Use raw objects for data events
-        vfs.readdir(path, options, onGet);
+        if (mountOptions.autoIndex) {
+          tryAgain = true;
+          vfs.readfile(path + mountOptions.autoIndex, options, onGet);
+        }
+        else {
+          options.encoding = null;
+          vfs.readdir(path, options, onGet);
+        }
       } else {
         vfs.readfile(path, options, onGet);
       }
 
       function onGet(err, meta) {
         res.setHeader("Date", (new Date()).toUTCString());
-        if (err) return abort(err);
+        if (err) {
+          if (tryAgain) {
+            tryAgain = false;
+            options.encoding = null;
+            return vfs.readdir(path, options, onGet);
+          }
+          return abort(err);
+        }
         if (meta.rangeNotSatisfiable) return abort(meta.rangeNotSatisfiable, 416);
 
         if (meta.hasOwnProperty('etag')) res.setHeader("ETag", meta.etag);
@@ -118,11 +134,13 @@ module.exports = function setup(mount, vfs) {
               res.setHeader("Content-Range", "bytes " + meta.partialContent.start + "-" + meta.partialContent.end + "/" + meta.partialContent.size);
             }
           }
+          if (options.encoding === null) {
+            res.setHeader("Content-Type", "application/json");
+          }
         }
         if (meta.hasOwnProperty('stream')) {
           meta.stream.on("error", abort);
           if (options.encoding === null) {
-            res.setHeader("Content-Type", "application/json");
             var base = (req.socket.encrypted ? "https://" : "http://") + req.headers.host + pathJoin(mount, path);
             jsonEncoder(meta.stream, base).pipe(res);
           } else {
