@@ -9,12 +9,13 @@ module.exports = function () {
 
     return {
         mounts: mounts,
+        readfile: route("readfile"),
         readdir: route("readdir"),
         stat: route("stat"),
         realpath: route("realpath"),
+        mkfile: route("mkfile", true),
         mkdir: route("mkdir", true),
         rmfile: route("rmfile", true),
-        mkdir: route("mkdir", true),
         rmdir: route("rmdir", true),
         rename: route("rename", true),
         copy: route("copy", true),
