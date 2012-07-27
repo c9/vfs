@@ -256,6 +256,9 @@ function Worker(vfs) {
     function route(name) {
         var fn = vfs[name];
         return function wrapped(path, options, callback) {
+            if (typeof callback !== "function") {
+                throw new Error(name + ": callback must be function");
+            }
             // Call the real local function, but intercept the callback
             if (options.stream) {
                 options.stream = makeStreamProxy(options.stream);
