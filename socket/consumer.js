@@ -1,11 +1,25 @@
-var Stream = require('stream').Stream;
-var EventEmitter = require('events').EventEmitter;
-var inherits = require('util').inherits;
-var smith = require('smith');
+( // Module boilerplate to support browser globals, node.js and AMD.
+  (typeof module === "object" && function (m) { module.exports = m(require('stream'), require('events'), require('smith')); }) ||
+  (typeof define === "function" && function (m) { define("vfs-socket/consumer", ["stream", "events", "smith"], m); }) ||
+  (function (m) { window.consumer = m(window.stream, window.events, window.smith); })
+)(function (stream, events, smith) {
+"use strict";
+
+var exports = {};
+
+var Stream = stream.Stream;
+var EventEmitter = events.EventEmitter;
 var Agent = smith.Agent;
 
 exports.smith = smith;
 exports.Consumer = Consumer;
+
+function inherits(Child, Parent) {
+    Child.super_ = Parent;
+    Child.prototype = Object.create(Parent.prototype, {
+        constructor: { value: Child }
+    });
+}
 
 function Consumer() {
 
@@ -334,3 +348,6 @@ Consumer.prototype._emitConnect = function () {
     this.emit("connect", this.vfs);
 };
 
+return exports;
+
+});
