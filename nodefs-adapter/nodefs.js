@@ -1,5 +1,6 @@
 
 const PATH = require("path");
+const Stream = require("stream").Stream;
 
 module.exports = function(vfs, base) {
 
