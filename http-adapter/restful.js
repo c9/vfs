@@ -5,6 +5,8 @@ var pathJoin = require('path').join;
 
 module.exports = function setup(mount, vfs, mountOptions) {
 
+  if (!mountOptions) mountOptions = {};
+
   // Returns a json stream that wraps input object stream
   function jsonEncoder(input, path) {
     var output = new Stream();
