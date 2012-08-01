@@ -58,10 +58,12 @@ module.exports = function(vfs, base) {
             options.encoding = encoding;
 
         var stream = options.stream = new Stream();
+        stream.readable = true;
 
         vfs.mkfile(resolvePath(path), options, function(err, meta) {
             if (err)
                 return callback(err);
+            callback(null);
         });
 
         stream.emit("data", data);
