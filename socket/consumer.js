@@ -111,14 +111,14 @@ function Consumer() {
             stream.on("end", function () {
                 remote.onEnd(id);
                 delete streams[id];
-                nextID = id;
+                nextStreamID = id;
             });
         }
         if (stream.writable) {
             stream.on("close", function () {
                 remote.onClose(id);
                 delete streams[id];
-                nextID = id;
+                nextStreamID = id;
             });
         }
         var token = {id: id};
