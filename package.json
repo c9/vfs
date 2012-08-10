@@ -9,5 +9,8 @@
   },
   "devDependencies": {
     "stack": "~0.1.0"
+  },
+  "scripts": {
+    "test": "mocha"
   }
 }
