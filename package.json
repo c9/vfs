@@ -8,7 +8,8 @@
     "ws": "~0.4.20"
   },
   "devDependencies": {
-    "stack": "~0.1.0"
+    "chai": "~1.2.0",
+    "mocha": "~1.3.2"
   },
   "scripts": {
     "test": "git clean -df test/mock; mocha"
