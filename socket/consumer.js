@@ -96,6 +96,37 @@ function Consumer() {
         });
     });
 
+    // Cleanup streams, proxy streams, proxy processes, and proxy apis on disconnect.
+    this.on("disconnect", function () {
+        var err = new Error("EDISCONNECT: vfs socket disconnected");
+        err.code = "EDISCONNECT";
+        Object.keys(streams).forEach(function (id) {
+            var stream = streams[id];
+            delete streams[id];
+            stream.emit("error", err);
+        });
+        Object.keys(proxyStreams).forEach(function (id) {
+            var proxyStream = proxyStreams[id];
+            delete proxyStreams[id];
+            proxyStream.emit("error", err);
+        });
+        Object.keys(proxyProcesses).forEach(function (pid) {
+            var proxyProcess = proxyProcesses[pid];
+            delete proxyProcesses[pid];
+            proxyProcess.emit("error", err);
+        });
+        Object.keys(proxyWatchers).forEach(function (id) {
+            var proxyWatcher = proxyWatchers[id];
+            delete proxyWatchers[id];
+            proxyWatcher.emit("error", err);
+        });
+        Object.keys(proxyApis).forEach(function (name) {
+            var proxyApi = proxyApis[name];
+            delete proxyApis[name];
+            proxyApi.emit("error", err);
+        });
+    });
+
     var nextStreamID = 1;
     function storeStream(stream) {
         while (streams.hasOwnProperty(nextStreamID)) { nextStreamID++; }
@@ -242,7 +273,7 @@ function Consumer() {
         if (!stream) return;
         stream.destroy();
         delete streams[id];
-        nextID = id;
+        nextStreamID = id;
     }
     function pause(id) {
         var stream = streams[id];
@@ -262,7 +293,7 @@ function Consumer() {
         else
             stream.end();
         delete streams[id];
-        nextID = id;
+        nextStreamID = id;
     }
 
 
@@ -306,7 +337,7 @@ function Consumer() {
     }
 
     function emit() {
-        remote.emit.apply(this, arguments);
+        remote.emit.apply(remote, arguments);
     }
 
     // Return fake endpoints in the initial return till we have the real ones.

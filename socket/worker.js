@@ -30,7 +30,7 @@ function Worker(vfs) {
         kill: kill,
 
         // Endpoint for watchers at meta.watcher
-        close: close,
+        close: closeWatcher,
 
         // Endpoint for apis at meta.api
         call: call,
@@ -74,7 +74,7 @@ function Worker(vfs) {
     function subscribe(name, callback) {
         handlers[name] = function (value) {
             remote.onEvent(name, value);
-        }
+        };
         vfs.on(name, handlers[name], callback);
     }
 
@@ -94,6 +94,37 @@ function Worker(vfs) {
         Object.keys(proxyStreams).forEach(function (id) {
             var stream = proxyStreams[id];
             if (stream.writable) stream.emit("drain");
+        });
+    });
+
+    // Cleanup streams, proxy streams, proxy processes, and proxy apis on disconnect.
+    this.on("disconnect", function () {
+        var err = new Error("EDISCONNECT: vfs socket disconnected");
+        err.code = "EDISCONNECT";
+        Object.keys(streams).forEach(function (id) {
+            var stream = streams[id];
+            delete streams[id];
+            stream.emit("error", err);
+        });
+        Object.keys(proxyStreams).forEach(function (id) {
+            var proxyStream = proxyStreams[id];
+            delete proxyStreams[id];
+            proxyStream.emit("error", err);
+        });
+        Object.keys(processes).forEach(function (pid) {
+            var process = processes[pid];
+            delete processes[pid];
+            process.emit("error", err);
+        });
+        Object.keys(watchers).forEach(function (id) {
+            var watcher = watchers[id];
+            delete watchers[id];
+            watcher.emit("error", err);
+        });
+        Object.keys(apis).forEach(function (name) {
+            var api = apis[name];
+            delete apis[name];
+            api.emit("error", err);
         });
     });
 
@@ -138,14 +169,14 @@ function Worker(vfs) {
             stream.on("end", function () {
                 remote.onEnd(id);
                 delete streams[id];
-                nextID = id;
+                nextStreamID = id;
             });
         }
         if (stream.writable) {
             stream.on("close", function () {
                 remote.onClose(id);
                 delete streams[id];
-                nextID = id;
+                nextStreamID = id;
             });
         }
         var token = {id: id};
@@ -202,7 +233,7 @@ function Worker(vfs) {
         if (!stream) return;
         stream.destroy();
         delete streams[id];
-        nextID = id;
+        nextStreamID = id;
     }
     function end(id, chunk) {
         var stream = streams[id];
@@ -212,7 +243,7 @@ function Worker(vfs) {
         else
             stream.end();
         delete streams[id];
-        nextID = id;
+        nextStreamID = id;
     }
 
     function kill(pid, code) {
@@ -220,7 +251,7 @@ function Worker(vfs) {
         process.kill(code);
     }
 
-    function close(id) {
+    function closeWatcher(id) {
         var watcher = watchers[id];
         delete watchers[id];
         watcher.close();
