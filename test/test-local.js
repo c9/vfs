@@ -12,8 +12,9 @@ describe('vfs-local', function () {
     checkSymlinks: true
   }));
 
-  describe('vfs.resolve()', function () {
+  var fs = require('fs');
 
+  describe('vfs.resolve()', function () {
     it('should prepend root when resolving virtual paths', function (done) {
       var vpath = "/dir/stuff.json";
       vfs.resolve(vpath, {}, function (err, meta) {
@@ -33,6 +34,12 @@ describe('vfs-local', function () {
       vfs.resolve(path, { alreadyRooted: true }, function (err, meta) {
         if (err) return done(err);
         expect(meta).property("path").equal(path);
+        done();
+      });
+    });
+    it('should error with ENOENT when the path is invalid', function (done) {
+      vfs.resolve("/notexists.txt", {}, function (err, meta) {
+        expect(err).property("code").equals("ENOENT");
         done();
       });
     });
@@ -85,6 +92,12 @@ describe('vfs-local', function () {
         done();
       });
     });
+    it("should error with EISDIR on directories", function (done) {
+      vfs.readfile("/", {}, function (err, stat) {
+        expect(err).property("code").equal("EISDIR");
+        done();
+      });
+    });
   });
 
   describe('vfs.readdir()', function () {
@@ -104,6 +117,277 @@ describe('vfs-local', function () {
         });
       });
     });
+    it("should error with ENOENT when the folder doesn't exist", function (done) {
+      vfs.readdir("/fake", {}, function (err, meta) {
+        expect(err).property("code").equal("ENOENT");
+        done();
+      });
+    });
+    it("should error with ENOTDIR when the path is a file", function (done) {
+      vfs.readdir("/file.txt", {}, function (err, meta) {
+        expect(err).property("code").equal("ENOTDIR");
+        done();
+      });
+    });
   });
 
+  describe('vfs.mkfile()', function () {
+    it("should create a file using using readble in options", function (done) {
+      var stream = fs.createReadStream(__filename);
+      var vpath = "/test.js";
+      // Make sure the file doesn't exist.
+      expect(fs.existsSync(base + vpath)).not.ok;
+      vfs.mkfile(vpath, { stream: stream }, function (err, meta) {
+        if (err) {
+          fs.unlinkSync(base + vpath);
+          return done(err);
+        }
+        var actual = fs.readFileSync(base + vpath, "utf8");
+        var original = fs.readFileSync(__filename, "utf8");
+        fs.unlinkSync(base + vpath);
+        expect(actual).equal(original);
+        done();
+      });
+    });
+    it("should create a file using writable in callback", function (done) {
+      var vpath = "/test.js";
+      // Make sure the file doesn't exist.
+      expect(fs.existsSync(base + vpath)).not.ok;
+      vfs.mkfile(vpath, {}, function (err, meta) {
+        if (err) {
+          fs.unlinkSync(base + vpath);
+          return done(err);
+        }
+        expect(meta).property("stream").property("writable").ok;
+        var writable = meta.stream;
+        var readable = fs.createReadStream(__filename);
+        readable.pipe(writable);
+        writable.on("saved", function () {
+          var actual = fs.readFileSync(base + vpath, "utf8");
+          var original = fs.readFileSync(__filename, "utf8");
+          fs.unlinkSync(base + vpath);
+          expect(actual).equal(original);
+          done();
+        });
+      });
+    });
+    it("should update an existing file using readble in options", function (done) {
+      var vpath = "/changeme.txt";
+      var stream = fs.createReadStream(__filename);
+      fs.writeFileSync(base + vpath, "Original Content\n");
+      vfs.mkfile(vpath, {stream: stream}, function (err, meta) {
+        if (err) {
+          fs.unlinkSync(base + vpath);
+          return done(err);
+        }
+        var actual = fs.readFileSync(base + vpath, "utf8");
+        var original = fs.readFileSync(__filename, "utf8");
+        fs.unlinkSync(base + vpath);
+        expect(actual).equal(original);
+        done();
+      });
+    }),
+    it("should update an existing file using writable in callback", function (done) {
+      var vpath = "/changeme.txt";
+      fs.writeFileSync(base + vpath, "Original Content\n");
+      vfs.mkfile(vpath, {}, function (err, meta) {
+        if (err) {
+          fs.unlinkSync(base + vpath);
+          return done(err);
+        }
+        expect(meta).property("stream").property("writable").ok;
+        var writable = meta.stream;
+        var readable = fs.createReadStream(__filename);
+        readable.pipe(writable);
+        writable.on("saved", function () {
+          var actual = fs.readFileSync(base + vpath, "utf8");
+          var original = fs.readFileSync(__filename, "utf8");
+          fs.unlinkSync(base + vpath);
+          expect(actual).equal(original);
+          done();
+        });
+      });
+    });
+  });
+
+  describe('vfs.mkdir()', function () {
+    it("should create a directory", function (done) {
+      var vpath = "/newdir";
+      // Make sure it doesn't exist yet
+      expect(fs.existsSync(base + vpath)).not.ok;
+      vfs.mkdir(vpath, {}, function (err, meta) {
+        if (err) {
+          fs.rmdirSync(base + vpath);
+          return done(err);
+        }
+        expect(fs.existsSync(base + vpath)).ok;
+        fs.rmdirSync(base + vpath);
+        done();
+      });
+    });
+    it("should error with EEXIST when the directory already exists", function (done) {
+      vfs.mkdir("/dir", {}, function (err, meta) {
+        expect(err).property("code").equal("EEXIST");
+        done();
+      });
+    });
+    it("should error with EEXIST when the file already exists", function (done) {
+      vfs.mkdir("/file.txt", {}, function (err, meta) {
+        expect(err).property("code").equal("EEXIST");
+        done();
+      });
+    });
+  });
+
+  describe('vfs.rmfile()', function () {
+    it("should delete a file", function (done) {
+      var vpath = "/deleteme.txt";
+      fs.writeFileSync(base + vpath, "DELETE ME!\n");
+      expect(fs.existsSync(base + vpath)).ok;
+      vfs.rmfile(vpath, {}, function (err, meta) {
+        if (err) return done(err);
+        expect(fs.existsSync(base + vpath)).not.ok;
+        done();
+      });
+    });
+    it("should error with ENOENT if the file doesn't exist", function (done) {
+      var vpath = "/badname.txt";
+      expect(fs.existsSync(base + vpath)).not.ok;
+      vfs.rmfile(vpath, {}, function (err, meta) {
+        expect(err).property("code").equal("ENOENT");
+        done();
+      });
+    });
+    it("should error with EISDIR if the path is a directory", function (done) {
+      var vpath = "/dir";
+      expect(fs.existsSync(base + vpath)).ok;
+      vfs.rmfile(vpath, {}, function (err, meta) {
+        expect(err).property("code").equal("EISDIR");
+        done();
+      });
+    });
+  });
+
+  describe('vfs.rmdir()', function () {
+    it("should delete a file", function (done) {
+      var vpath = "/newdir";
+      fs.mkdirSync(base + vpath);
+      expect(fs.existsSync(base + vpath)).ok;
+      vfs.rmdir(vpath, {}, function (err, meta) {
+        if (err) return done(err);
+        expect(fs.existsSync(base + vpath)).not.ok;
+        done();
+      });
+    });
+    it("should error with ENOENT if the file doesn't exist", function (done) {
+      var vpath = "/badname.txt";
+      expect(fs.existsSync(base + vpath)).not.ok;
+      vfs.rmdir(vpath, {}, function (err, meta) {
+        expect(err).property("code").equal("ENOENT");
+        done();
+      });
+    });
+    it("should error with ENOTDIR if the path is a file", function (done) {
+      var vpath = "/file.txt";
+      expect(fs.existsSync(base + vpath)).ok;
+      vfs.rmdir(vpath, {}, function (err, meta) {
+        expect(err).property("code").equal("ENOTDIR");
+        done();
+      });
+    });
+  });
+
+  describe('vfs.rename()', function () {
+    it("should rename a file using options.to", function (done) {
+      var before = "/start.txt";
+      var after = "/end.txt";
+      var text = "Move me please\n";
+      fs.writeFileSync(base + before, text);
+      expect(fs.existsSync(base + before)).ok;
+      expect(fs.existsSync(base + after)).not.ok;
+      vfs.rename(before, {to: after}, function (err, meta) {
+        if (err) return done(err);
+        expect(fs.existsSync(base + before)).not.ok;
+        expect(fs.existsSync(base + after)).ok;
+        expect(fs.readFileSync(base + after, "utf8")).equal(text);
+        fs.unlinkSync(base + after);
+        done();
+      });
+    });
+    it("should rename a file using options.from", function (done) {
+      var before = "/start.txt";
+      var after = "/end.txt";
+      var text = "Move me please\n";
+      fs.writeFileSync(base + before, text);
+      expect(fs.existsSync(base + before)).ok;
+      expect(fs.existsSync(base + after)).not.ok;
+      vfs.rename(after, {from: before}, function (err, meta) {
+        if (err) return done(err);
+        expect(fs.existsSync(base + before)).not.ok;
+        expect(fs.existsSync(base + after)).ok;
+        expect(fs.readFileSync(base + after, "utf8")).equal(text);
+        fs.unlinkSync(base + after);
+        done();
+      });
+    });
+    it("should error with ENOENT if the source doesn't exist", function (done) {
+      vfs.rename("/notexist", {to:"/newname"}, function (err, meta) {
+        expect(err).property("code").equal("ENOENT");
+        done();
+      });
+    });
+  });
+
+  describe('vfs.copy()', function () {
+    it("should copy a file using options.to", function (done) {
+      var source = "/file.txt";
+      var target = "/copy.txt";
+      var text = fs.readFileSync(base + source, "utf8");
+      vfs.copy(source, {to: target}, function (err, meta) {
+        if (err) return done(err);
+        expect(fs.existsSync(base + target)).ok;
+        expect(fs.readFileSync(base + target, "utf8")).equal(text);
+        fs.unlinkSync(base + target);
+        done();
+      });
+    });
+    it("should copy a file using options.from", function (done) {
+      var source = "/file.txt";
+      var target = "/copy.txt";
+      var text = fs.readFileSync(base + source, "utf8");
+      vfs.copy(target, {from: source}, function (err, meta) {
+        if (err) return done(err);
+        expect(fs.existsSync(base + target)).ok;
+        expect(fs.readFileSync(base + target, "utf8")).equal(text);
+        fs.unlinkSync(base + target);
+        done();
+      });
+    });
+    it("should error with ENOENT if the source doesn't exist", function (done) {
+      vfs.copy("/badname.txt", {to:"/copy.txt"}, function (err, meta) {
+        expect(err).property("code").equal("ENOENT");
+        done();
+      });
+    });
+  });
+
+  describe('vfs.symlink()', function () {
+    it("should create a symlink", function (done) {
+      var target = "file.txt";
+      var vpath = "/newlink.txt";
+      var text = fs.readFileSync(root + target, "utf8");
+      vfs.symlink(vpath, {target: target}, function (err, meta) {
+        if (err) return done(err);
+        expect(fs.readFileSync(base + vpath, "utf8")).equal(text);
+        fs.unlinkSync(base + vpath);
+        done();
+      });
+    });
+    it("should error with EEXIST if the file already exists", function (done) {
+      vfs.symlink("/file.txt", {target:"/this/is/crazy"}, function (err, meta) {
+        expect(err).property("code").equal("EEXIST");
+        done();
+      });
+    });
+  });
 });
