@@ -13,6 +13,7 @@ describe('vfs-local', function () {
   }));
 
   var fs = require('fs');
+  if (!fs.existsSync) fs.existsSync = require('path').existsSync;
 
   describe('vfs.resolve()', function () {
     it('should prepend root when resolving virtual paths', function (done) {
