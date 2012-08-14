@@ -107,7 +107,7 @@ module.exports = function setup(fsOptions) {
 
         // Process Management
         spawn: spawn,
-        exec: exec,
+        execFile: execFile,
 
         // Basic async event emitter style API
         on: on,
@@ -560,6 +560,83 @@ module.exports = function setup(fsOptions) {
         });
     }
 
+    function watch(path, options, callback) {
+        var meta = {};
+        resolvePath(path, function (err, path) {
+            if (err) return callback(err);
+            if (options.file) {
+                meta.watcher = fs.watchFile(path, options, function () {});
+                meta.watcher.close = function () {
+                    fs.unwatchFile(path);
+                };
+            }
+            else {
+                meta.watcher = fs.watch(path, options, function () {});
+            }
+            callback(null, meta);
+        });
+    }
+
+    function connect(port, options, callback) {
+        var retries = options.hasOwnProperty('retries') ? options.retries : 5;
+        var retryDelay = options.hasOwnProperty('retryDelay') ? options.retryDelay : 50;
+        tryConnect();
+        function tryConnect() {
+            var socket = net.connect(port, function () {
+                if (options.hasOwnProperty('encoding')) {
+                    socket.setEncoding(options.encoding);
+                }
+                callback(null, {stream:socket});
+            });
+            socket.once("error", function (err) {
+                if (err.code === "ECONNREFUSED" && retries) {
+                    setTimeout(tryConnect, retryDelay);
+                    retries--;
+                    retryDelay *= 2;
+                    return;
+                }
+                return callback(err);
+            });
+        }
+    }
+
+    function spawn(executablePath, options, callback) {
+        var args = options.args || [];
+
+        if (options.hasOwnProperty('env')) {
+            options.env.__proto__ = fsOptions.defaultEnv;
+        } else {
+            options.env = fsOptions.defaultEnv;
+        }
+
+        var child;
+        try {
+            child = childProcess.spawn(executablePath, args, options);
+        } catch (err) {
+            return callback(err);
+        }
+        if (options.resumeStdin) child.stdin.resume();
+        if (options.hasOwnProperty('stdoutEncoding')) {
+            child.stdout.setEncoding(options.stdoutEncoding);
+        }
+        if (options.hasOwnProperty('stderrEncoding')) {
+            child.stderr.setEncoding(options.stderrEncoding);
+        }
+
+        callback(null, {
+            process: child
+        });
+    }
+
+    function execFile(executablePath, options, callback) {
+      childProcess.execFile(executablePath, options.args || [], function (err, stdout, stderr) {
+        if (err) return callback(err);
+        callback(null, {
+          stdout: stdout,
+          stderr: stderr
+        });
+      });
+    }
 
     function on(name, handler, callback) {
         if (!handlers[name]) handlers[name] = [];
@@ -588,79 +665,7 @@ module.exports = function setup(fsOptions) {
         callback && callback();
     }
 
-    function spawn(executablePath, options, callback) {
 
-      var args = options.args || [];
-
-      if (options.hasOwnProperty('env')) {
-        options.env.__proto__ = fsOptions.defaultEnv;
-      } else {
-        options.env = fsOptions.defaultEnv;
-      }
-
-      var child;
-      try {
-        child = childProcess.spawn(executablePath, args, options);
-      } catch (err) {
-        return callback(err);
-      }
-      if (options.resumeStdin) child.stdin.resume();
-      if (options.hasOwnProperty('stdoutEncoding')) {
-        child.stdout.setEncoding(options.stdoutEncoding);
-      }
-      if (options.hasOwnProperty('stderrEncoding')) {
-        child.stderr.setEncoding(options.stderrEncoding);
-      }
-
-      child.kill = function(signal) {
-        killtree(child, signal);
-      };
-
-      callback(null, {
-        process: child
-      });
-    }
-
-    function exec(executablePath, options, callback) {
-      spawn(executablePath, options, function(err, meta) {
-        if (err) return callback(err);
-
-        var stdout = [];
-        var stderr = [];
-
-        meta.process.stdout.on("data", function(data) { stdout.push(data); });
-        meta.process.stderr.on("data", function(data) { stderr.push(data); });
-
-        meta.process.on("exit", function(code, signal) {
-          var err = null;
-          stdout = stdout.join("").trim();
-          stderr = stderr.join("").trim();
-
-          if (code || signal) {
-            err = new Error("process died");
-            if (signal) {
-              err.message += " because of signal " + signal;
-              err.signal = signal;
-            }
-            if (code) {
-              err.message += " with exit code " + code;
-              err.exitCode = code;
-            }
-            if (stdout) {
-              err.message += "\n" + stdout;
-              err.stdout = stdout;
-            }
-            if (stderr) {
-              err.message += "\n" + stderr;
-              err.stderr = stderr;
-            }
-            return callback(err, stdout, stderr);
-          }
-
-          callback(err, stdout, stderr);
-        });
-      });
-    }
 
     function extend(name, options, callback) {
 
@@ -717,51 +722,6 @@ module.exports = function setup(fsOptions) {
         callback(null, meta);
       }
 
-    }
-
-    function connect(port, options, callback) {
-
-      var retries = options.hasOwnProperty('retries') ? options.retries : 5;
-      var retryDelay = options.hasOwnProperty('retryDelay') ? options.retryDelay : 50;
-      tryConnect();
-      function tryConnect() {
-        var socket = net.connect(port, function () {
-          if (options.hasOwnProperty('encoding')) {
-            socket.setEncoding(options.encoding);
-          }
-          callback(null, {stream:socket});
-        });
-        socket.once("error", function (err) {
-          if (err.code === "ECONNREFUSED" && retries) {
-            setTimeout(tryConnect, retryDelay);
-            retries--;
-            retryDelay *= 2;
-            return;
-          }
-          return callback(err);
-        });
-      }
-    }
-
-    // Simple wrapper around node's fs.watch function.  Returns a watcher object
-    // that emits "change" events.  Make sure to call .close() when done to
-    // prevent leaks.
-    function watch(path, options, callback) {
-
-      var meta = {};
-      realpath(path, function (err, path) {
-        if (err) return callback(err);
-        if (options.file) {
-          meta.watcher = fs.watchFile(path, options, function () {});
-          meta.watcher.close = function () {
-            fs.unwatchFile(path);
-          };
-        }
-        else {
-          meta.watcher = fs.watch(path, options, function () {});
-        }
-        callback(null, meta);
-      });
     }
 
 };

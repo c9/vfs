@@ -20,7 +20,7 @@ var data = {
 
     // Process Management
     spawn:    [ "executablePath", "string", "options", "object" ],
-    exec:     [ "executablePath", "string", "options", "object" ],
+    execFile: [ "executablePath", "string", "options", "object" ],
 
     // Basic async event emitter style API
     on:       [ "name", "string", "handler", "function" ],
