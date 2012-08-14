@@ -12,6 +12,6 @@
     "mocha": "~1.3.2"
   },
   "scripts": {
-    "test": "git clean -df test/mock; mocha"
+    "test": "git clean -df test/mock; mocha -R spec"
   }
 }

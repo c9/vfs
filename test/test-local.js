@@ -19,7 +19,7 @@ describe('vfs-local', function () {
     it('should prepend root when resolving virtual paths', function (done) {
       var vpath = "/dir/stuff.json";
       vfs.resolve(vpath, {}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(meta).property("path").equals(base + vpath);
         done();
       });
@@ -33,7 +33,7 @@ describe('vfs-local', function () {
     it('should not prepend when already rooted', function (done) {
       var path = base + "/file.txt";
       vfs.resolve(path, { alreadyRooted: true }, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(meta).property("path").equal(path);
         done();
       });
@@ -49,7 +49,7 @@ describe('vfs-local', function () {
   describe('vfs.stat()', function () {
     it('should return stat info for the text file', function (done) {
       vfs.stat("/file.txt", {}, function (err, stat) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(stat).property("name").equal("file.txt");
         expect(stat).property("size").equal(23);
         expect(stat).property("mime").equal("text/plain");
@@ -67,7 +67,7 @@ describe('vfs-local', function () {
   describe('vfs.readfile()', function () {
     it("should read the text file", function (done) {
       vfs.readfile("/file.txt", {}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(meta).property("mime").equals("text/plain");
         expect(meta).property("size").equals(23);
         expect(meta).property("etag");
@@ -104,7 +104,7 @@ describe('vfs-local', function () {
   describe('vfs.readdir()', function () {
     it("should read the directory", function (done) {
       vfs.readdir("/", {}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(meta).property("etag");
         expect(meta).property("stream").property("readable");
         var stream = meta.stream;
@@ -246,7 +246,7 @@ describe('vfs-local', function () {
       fs.writeFileSync(base + vpath, "DELETE ME!\n");
       expect(fs.existsSync(base + vpath)).ok;
       vfs.rmfile(vpath, {}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(fs.existsSync(base + vpath)).not.ok;
         done();
       });
@@ -275,7 +275,7 @@ describe('vfs-local', function () {
       fs.mkdirSync(base + vpath);
       expect(fs.existsSync(base + vpath)).ok;
       vfs.rmdir(vpath, {}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(fs.existsSync(base + vpath)).not.ok;
         done();
       });
@@ -307,7 +307,7 @@ describe('vfs-local', function () {
       expect(fs.existsSync(base + before)).ok;
       expect(fs.existsSync(base + after)).not.ok;
       vfs.rename(before, {to: after}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(fs.existsSync(base + before)).not.ok;
         expect(fs.existsSync(base + after)).ok;
         expect(fs.readFileSync(base + after, "utf8")).equal(text);
@@ -323,7 +323,7 @@ describe('vfs-local', function () {
       expect(fs.existsSync(base + before)).ok;
       expect(fs.existsSync(base + after)).not.ok;
       vfs.rename(after, {from: before}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(fs.existsSync(base + before)).not.ok;
         expect(fs.existsSync(base + after)).ok;
         expect(fs.readFileSync(base + after, "utf8")).equal(text);
@@ -345,7 +345,7 @@ describe('vfs-local', function () {
       var target = "/copy.txt";
       var text = fs.readFileSync(base + source, "utf8");
       vfs.copy(source, {to: target}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(fs.existsSync(base + target)).ok;
         expect(fs.readFileSync(base + target, "utf8")).equal(text);
         fs.unlinkSync(base + target);
@@ -357,7 +357,7 @@ describe('vfs-local', function () {
       var target = "/copy.txt";
       var text = fs.readFileSync(base + source, "utf8");
       vfs.copy(target, {from: source}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(fs.existsSync(base + target)).ok;
         expect(fs.readFileSync(base + target, "utf8")).equal(text);
         fs.unlinkSync(base + target);
@@ -378,7 +378,7 @@ describe('vfs-local', function () {
       var vpath = "/newlink.txt";
       var text = fs.readFileSync(root + target, "utf8");
       vfs.symlink(vpath, {target: target}, function (err, meta) {
-        if (err) return done(err);
+        if (err) throw err;
         expect(fs.readFileSync(base + vpath, "utf8")).equal(text);
         fs.unlinkSync(base + vpath);
         done();
@@ -387,6 +387,110 @@ describe('vfs-local', function () {
     it("should error with EEXIST if the file already exists", function (done) {
       vfs.symlink("/file.txt", {target:"/this/is/crazy"}, function (err, meta) {
         expect(err).property("code").equal("EEXIST");
+        done();
+      });
+    });
+  });
+
+  describe('vfs.watch()', function () {
+    it("should notice a directly watched file change", function (done) {
+      var vpath = "/newfile.txt";
+      expect(fs.existsSync(base + vpath)).not.ok;
+      var writable = fs.createWriteStream(base + vpath);
+      vfs.watch(vpath, {}, function (err, meta) {
+        if (err) throw err;
+        expect(meta).property("watcher").ok;
+        var watcher = meta.watcher;
+        watcher.on("change", function (event, filename) {
+          watcher.close();
+          expect(event).equal("change");
+          expect(filename).equal(vpath.substr(1));
+          writable.end();
+          writable.on("close", function () {
+            fs.unlinkSync(base + vpath);
+            done();
+          });
+        });
+        writable.write("Change!");
+      });
+    });
+    it("should notice a new file in a watched directory", function (done) {
+      var vpath = "/newfile.txt";
+      expect(fs.existsSync(base + vpath)).not.ok;
+      vfs.watch("/", {}, function (err, meta) {
+        if (err) throw err;
+        expect(meta).property("watcher").ok;
+        var watcher = meta.watcher;
+        watcher.on("change", function (event, filename) {
+          watcher.close();
+          expect(event).ok;
+          expect(filename).equal(vpath.substr(1));
+          fs.unlinkSync(base + vpath);
+          done();
+        });
+        fs.writeFileSync(base + vpath, "newfile!");
+      });
+    });
+  });
+
+  describe('vfs.connect()', function () {
+    var net = require('net');
+    it("should connect to a tcp server and ping-pong", function (done) {
+      var stream;
+      var server = net.createServer(function (client) {
+        client.setEncoding('utf8');
+        client.once("data", function (chunk) {
+          expect(chunk).equal("ping");
+          stream.once("data", function (chunk) {
+            expect(chunk).equal("pong");
+            client.end();
+            stream.end();
+            server.close();
+            done();
+          });
+          client.write("pong");
+        });
+      });
+      server.listen(function () {
+        var port = server.address().port;
+        vfs.connect(port, {encoding:"utf8"}, function (err, meta) {
+          if (err) throw err;
+          expect(meta).property("stream").ok;
+          stream = meta.stream;
+          stream.write("ping");
+        });
+      });
+    });
+  });
+
+  describe('vfs.spawn()', function () {
+    it("should spawn a child process", function (done) {
+      var args = ["-e", "process.stdin.pipe(process.stdout)"];
+      vfs.spawn(process.execPath, {args: args, stdoutEncoding: "utf8"}, function (err, meta) {
+        if (err) throw err;
+        expect(meta).property("process").ok;
+        var child = meta.process;
+        expect(child).property("stdout").ok;
+        expect(child).property("stdin").ok;
+        child.stdout.on("data", function (chunk) {
+          expect(chunk).equal("echo me");
+          child.stdout.on("end", function () {
+            done();
+          });
+          child.stdin.end();
+        });
+        child.stdin.write("echo me");
+      });
+    });
+  });
+
+  describe('vfs.execFile()', function () {
+    it("should exec a child process", function (done) {
+      var args = ["-p", "-e", "process.version"];
+      vfs.execFile(process.execPath, {args:args}, function (err, meta) {
+        if (err) throw err;
+        expect(meta).property("stdout").equal(process.version + "\n");
+        expect(meta).property("stderr").equal("");
         done();
       });
     });
