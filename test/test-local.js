@@ -495,4 +495,77 @@ describe('vfs-local', function () {
       });
     });
   });
+
+  describe('vfs.on(), vfs.off(), vfs.emit()', function () {
+    it ("should register an event listener and catch an event", function (done) {
+      vfs.on("myevent", onEvent, function (err) {
+        if (err) throw err;
+        vfs.emit("myevent", 42, function (err) {
+          if (err) throw err;
+        });
+      });
+      function onEvent(data) {
+        expect(data).equal(42);
+        vfs.off("myevent", onEvent, done);
+      }
+    });
+    it("should catch multiple events of the same type", function (done) {
+      var times = 0;
+      vfs.on("myevent", onEvent, function (err) {
+        if (err) throw err;
+        vfs.emit("myevent", 43, function (err) {
+          if (err) throw err;
+        });
+        vfs.emit("myevent", 43, function (err) {
+          if (err) throw err;
+        });
+      });
+      function onEvent(data) {
+        expect(data).equal(43);
+        if (++times === 2) {
+          vfs.off("myevent", onEvent, done);
+        }
+      }
+    });
+    it("should call multiple listeners for a single event", function (done) {
+      var times = 0;
+      vfs.on("myevent", onEvent1, function (err) {
+        if (err) throw err;
+        vfs.on("myevent", onEvent2, function (err) {
+          if (err) throw err;
+          vfs.emit("myevent", 44, function (err) {
+            if (err) throw err;
+          });
+        });
+      });
+      function onEvent1(data) {
+        expect(data).equal(44);
+        times++;
+      }
+      function onEvent2(data) {
+        expect(data).equal(44);
+        if (++times === 2) {
+          vfs.off("myevent", onEvent1, function (err) {
+            if (err) throw err;
+            vfs.off("myevent", onEvent2, done);
+          });
+        }
+      }
+    });
+    it("should stop listening after a handler is removed", function (done) {
+      vfs.on("myevent", onEvent, function (err) {
+        if (err) throw err;
+        vfs.emit("myevent", 45, function (err) {
+          if (err) throw err;
+          vfs.off("myevent", onEvent, function (err) {
+            if (err) throw err;
+            vfs.emit("myevent", 46, done);
+          });
+        });
+      });
+      function onEvent(data) {
+        expect(data).equal(45);
+      }
+    });
+  });
 });
