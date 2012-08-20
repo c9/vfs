@@ -1,6 +1,6 @@
 # VFS - Virtual File System
 
-[![Build Status](https://secure.travis-ci.org/c9/vfs.png)](http://travis-ci.org/c9/vfs)
+**This repo is being broken up into several smaller repos.  For example, see [vfs-local](https://github.com/c9/vfs-local) and [vfs-socket](https://github.com/c9/vfs-socket).**
 
 This module is a vfs implementation for node.js.  Originally it was created for
 our internal needs at Cloud9IDE.  Eventually it grew to be generally useful so
