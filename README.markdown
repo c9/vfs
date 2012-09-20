@@ -19,7 +19,7 @@ instances and exposing them with a simple RESTful API.
 
 See the docs in the http-adapter for specifics.
 
-<https://github.com/c9/vfs/tree/master/http-adapter>
+<https://github.com/c9/vfs-http-adapter>
 
 # JavaScript Interface
 
